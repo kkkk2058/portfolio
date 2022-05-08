@@ -30,7 +30,8 @@
 	
   /*size*/
   --size-border-radius: 4px;
-
+  /*annimation*/
+  --annimation-duration:300ms;
 }
 
 /*Universal tags*/
@@ -135,7 +136,7 @@ p {
 	padding: 40px;
 	text-align:center;
 }
-.home_avatar{
+.home__avatar{
 	width:250px;
 	height:250px;
 	border-radius: 50%;
@@ -143,12 +144,12 @@ p {
 	
 }
 
-.home_description,
-.home_title{
+.home__description,
+.home__title{
 	color: var(--color-white);
 }
 
-.home_contact{
+.home__contact{
 	color: var(--color-white);
 	font-size: var(--font-regular);
 	font-weight:var(--weight-bold);
@@ -156,4 +157,73 @@ p {
 	padding: 8px 12px;
 	border: 2px solid var(--color-white);
 	border-radius: var(--size-border-radius);
+}
+
+
+/* section common*/
+
+.section{
+	padding: 50px;
+	text-align: center;
+	max-width; 1200px;
+	margin: auto;
+}
+
+.about__majors{
+	display: flex;
+	justify-content: space-between;
+	margin: 80px 0;
+}
+
+.major__icon{
+	width: 170px;
+	height:170px;
+	line-height:170px;
+	font-size:70px;
+	color:var(--color-mint);
+	border: 1px solid var(--color-blue);
+	border-radius:50%;
+	margin-bottom:16px;
+}
+.major__icon:hover i {
+	color:var(--color-blue);
+	transform: rotate(-360deg) scale(1.2)
+}
+.major__icon i{
+	transition: all var(--annimation-duration) ease;
+}
+
+.major__title, .major__description{
+	color: var(--color-dark-grey);
+}
+
+.major__description{
+	font-size: var(--font-small);
+}
+.academy{
+	display: flex;
+	align-items: center;
+}
+
+.university_logo{
+	width:50px;
+	height:50px;
+}
+
+.academy__description{
+	margin: 0 16px;
+	text-align: left;
+}
+
+.academy__name,
+.academy__period{
+	color:var(--color-light-grey);
+	
+}
+.academy__name{
+	font-size:var(--font-small);
+	
+}
+.academy__period{
+	font-size:var(--font-micro);
 }
