@@ -300,3 +300,98 @@ p {
 .Etc{
 	padding:20px;
 }
+
+/*work*/
+.categorie__btn{
+	border:1px solid var(--color-dark-white);
+	border-radius: var(--size-border-radius);
+	font-size: var(--font-regular);
+	font-size: var(--font-regular);
+	padding: 8px 48px;
+}
+
+.work__categorie{
+	margin:40px;
+}
+
+.categorie__btn.active,
+.categorie__btn:hover {
+	background-color: var(--color-pink);
+	color:var(--color-white);
+}
+
+.categorie__btn.active .categorie__count,
+.categorie__btn:hover .categorie__count{
+	opacity: 1;
+	top:0;
+}
+
+
+.categorie__count{
+	background-color: var(--color-orange);
+	border-radius: 50%;
+	width:24px;
+	height:24px;
+	line-height:24px;
+	display: inline-block;
+	position: relative;
+	top:-20px;
+	left: 4px;
+	opacity: 0;
+	transition: all var(--annimation-duration) ease-in;
+	
+}
+
+.work_projects{
+	display:flex;
+	flex-wrap: wrap;
+	justify-content:center;
+}
+
+.project{
+	position:relative;
+	width:200px;
+	height:200px;
+	margin:2px;
+	background-color: var(--color-light-white);
+}
+.project_imgs{
+	max-width:100%;
+	max-height:100%;
+}
+.project_description{
+	position: absolute;
+	width:100%;
+	height:100%;
+	top:0;
+	left:0;
+	background-color:black;
+	display:flex;
+	justify-content:center;
+	flex-direction:column;
+	opacity:0;
+	transform: translateY(10px);
+	transition: var(--annimation-duration) ease-in;
+}
+.project_description h3{
+	color:var(--color-white);
+}
+
+.project_description h3:after{
+	content:'';
+	display: block;
+	position:relative;
+	left:50%;
+	margin-left:-12px;
+	margin-top: 8px;
+	width:25px;
+	height:2px;
+	background-color: var(--color-dark-white);
+	
+}
+
+.project_description:hover{
+	transform: translateY(0px);
+	opacity: 0.8;
+	top:0;
+}
