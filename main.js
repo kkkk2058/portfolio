@@ -27,9 +27,6 @@ navbarMenu.addEventListener('click', (event) => {
   }
 	scrollIntoView(link);
 });
-//navbarMenu.classList.remove('open');
-//scrollIntoView(link);
-//});
 
 
 //Handle click on 'contact me' button on home
@@ -37,6 +34,14 @@ const homeContactBtn = document.querySelector('.home__contact');
 homeContactBtn.addEventListener('click', () =>{
 	scrollIntoView('#contact');
 	
+});
+
+
+
+const home= document.querySelector('.home__container');
+const homeHeight= home.getBoundingClientRect().height;
+document.addEventListener('scroll', () => {
+	home.style.opacity=1- window.scrollY/ homeHeight;
 });
 
 
