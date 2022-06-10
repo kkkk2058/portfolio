@@ -4,10 +4,7 @@
 const navbar= document.querySelector('#navbar');
 const navbarHeight= navbar.getBoundingClientRect().height;
 document.addEventListener('scroll', () => {
-	/*
-	console.log(window.scrollY)
-	console.log(navbarHeight)
-	*/
+	
 	if(window.scrollY > navbarHeight){
 		navbar.classList.add('navbar--dark')
 	}else{
@@ -36,13 +33,36 @@ homeContactBtn.addEventListener('click', () =>{
 	
 });
 
-
-
+//Make home slowly fade to transparent as the wondow window scrolls down
 const home= document.querySelector('.home__container');
 const homeHeight= home.getBoundingClientRect().height;
 document.addEventListener('scroll', () => {
 	home.style.opacity=1- window.scrollY/ homeHeight;
 });
+
+
+
+//Show arrow up botton when scrolling down
+document.addEventListener('scroll', () => {
+const arrowUp = document.querySelector('.arrow-up');
+	if(window.scrollY > navbarHeight/2){
+		arrowUp.classList.add('visible')
+	}else{
+		arrowUp.classList.remove('visible')
+	}
+});
+
+//raise up to home when click arrow up botton
+//Handle click on the arrow up botton
+const arrowUpBtn = document.querySelector('.arrow-up');
+arrowUpBtn.addEventListener('click', () =>{
+	scrollIntoView('#home');
+	
+});
+
+
+
+
 
 
 function scrollIntoView(selector) {
