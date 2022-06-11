@@ -22,6 +22,7 @@ navbarMenu.addEventListener('click', (event) => {
   if (link == null) {
     return;
   }
+	navbarMenu.classList.remove('open');
 	scrollIntoView(link);
 });
 
@@ -32,6 +33,16 @@ homeContactBtn.addEventListener('click', () =>{
 	scrollIntoView('#contact');
 	
 });
+
+//Navbar toogle button for small screen
+const navbarToggleBtn = document.querySelector('.navbar__toggle-btn');
+ navbarToggleBtn.addEventListener('click', () =>{
+	navbarMenu.classList.toggle('open');
+	
+});
+
+
+
 
 //Make home slowly fade to transparent as the wondow window scrolls down
 const home= document.querySelector('.home__container');
