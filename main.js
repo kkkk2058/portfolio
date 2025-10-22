@@ -11,7 +11,7 @@ function initLocationService() {
 
   // 2. 목표 지점 설정 (금하로24나길 48)
   const targetLocation = {
-    name: "금하로24나길 48",
+    name: "금하로24나길 48 dd",
     lat: 37.4505472,
     lon: 126.9006336,
   };
