@@ -2,8 +2,7 @@
 
 /**
  * 1. LocationService (GPS 위치 관리자) - [ 수정됨 ]
- * 10초 이내에 실제 GPS 신호를 받지 못하면,
- * 'simulationCoords'에 설정된 가짜 위치로 시뮬레이션 모드를 시작합니다.
+ * AR.js 카메라에 시뮬레이션 좌표를 직접 주입하도록 수정되었습니다.
  */
 AFRAME.registerComponent("location-service", {
   init: function () {
@@ -20,24 +19,20 @@ AFRAME.registerComponent("location-service", {
     };
     // ------------------------------------
 
-    // 10초 후 시뮬레이션 모드 강제 실행 (실제 GPS가 실패할 경우)
     const simulationTimeout = setTimeout(() => {
       if (!this.hasLocation) {
         console.warn(
           "LocationService: Real GPS timeout. Activating SIMULATION MODE."
         );
         this.simulationActive = true;
-        this.useSimulationData();
+        this.useSimulationData(); // 시뮬레이션 모드 시작
       }
-    }, 10000); // 10초 타임아웃
+    }, 10000);
 
-    // 1. 실제 GPS 시도
     this.watchId = navigator.geolocation.watchPosition(
       (pos) => {
-        // 실제 GPS 성공!
-        if (this.simulationActive) return; // 시뮬레이션이 이미 켜졌으면 무시
-
-        clearTimeout(simulationTimeout); // 시뮬레이션 타임아웃 취소
+        if (this.simulationActive) return;
+        clearTimeout(simulationTimeout);
         this.hasLocation = true;
 
         const coords = {
@@ -52,10 +47,8 @@ AFRAME.registerComponent("location-service", {
         this.el.emit("gps-updated", { coords: coords }, false);
       },
       (err) => {
-        // 실제 GPS 오류 (스크린샷의 오류들)
-        if (this.simulationActive) return; // 시뮬레이션이 켜졌으면 무시
+        if (this.simulationActive) return;
         console.error("LocationService Error (as seen in screenshot):", err.message);
-        // 타임아웃이 시뮬레이션을 처리하도록 둡니다.
       },
       { enableHighAccuracy: true, timeout: 5000, maximumAge: 0 }
     );
@@ -63,12 +56,14 @@ AFRAME.registerComponent("location-service", {
 
   // 2. 시뮬레이션 데이터 사용
   useSimulationData: function () {
-    this.hasLocation = true; // 위치 잡힘으로 처리
+    this.hasLocation = true;
+    const sceneEl = this.el.sceneEl;
+    const cameraEl = sceneEl.camera.el; // 씬의 카메라를 찾습니다.
 
     const loadingText = document.getElementById("loadingText");
     if (loadingText) {
       loadingText.setAttribute("value", "SIMULATION MODE ACTIVE");
-      loadingText.setAttribute("color", "#FFD700"); // 노란색으로 표시
+      loadingText.setAttribute("color", "#FFD700");
     }
 
     const fakeCoords = this.simulationCoords;
@@ -76,7 +71,17 @@ AFRAME.registerComponent("location-service", {
       `LocationService: Emitting FAKE location: ${fakeCoords.lat}, ${fakeCoords.lon}`
     );
 
-    // 3초마다 가짜 위치를 계속 전송 (watchPosition 흉내)
+    // ================== [ !! 핵심 수정 !! ] ==================
+    // AR.js의 'gps-projected-camera' 컴포넌트에 시뮬레이션 좌표를 강제로 설정합니다.
+    // 이것이 'undefined' 오류를 해결합니다.
+    console.log("Setting AR.js simulation coordinates...");
+    cameraEl.setAttribute("gps-projected-camera", {
+      simulateLatitude: fakeCoords.lat,
+      simulateLongitude: fakeCoords.lon,
+    });
+    // ========================================================
+
+    // 3초마다 'location-checker'가 사용할 커스텀 이벤트를 전송합니다.
     setInterval(() => {
       this.el.emit("gps-updated", { coords: fakeCoords }, false);
     }, 3000);
@@ -88,8 +93,8 @@ AFRAME.registerComponent("location-service", {
 });
 
 /**
- * 2. LocationChecker (특정 주소 근접 확인) - [ 수정됨 ]
- * '금하로24나길 48' (관악산 신도브래뉴)의 실제 좌표를 하드코딩합니다.
+ * 2. LocationChecker (특정 주소 근접 확인)
+ * (이전 코드와 동일)
  */
 AFRAME.registerComponent("location-checker", {
   schema: {
@@ -98,14 +103,12 @@ AFRAME.registerComponent("location-checker", {
   init: function () {
     this.isUserNearby = false;
 
-    // ================== [ 목표 주소 좌표 ] ==================
-    // '금하로24나길 48' (서울 금천구 시흥동 1017)의 실제 좌표입니다.
+    // '금하로24나길 48' (서울 금천구 시흥동 1017)의 실제 좌표
     this.targetAddressLocation = {
       name: "금하로24나길 48 (목표 지점)",
-      lat: 37.47915,
-      lon: 126.9059,
+      lat: 37.47281,
+      lon: 126.90805,
     };
-    // ======================================================
 
     console.log(
       `LocationChecker: Watching for location near ${this.targetAddressLocation.name} (${this.targetAddressLocation.lat}, ${this.targetAddressLocation.lon})`
@@ -120,7 +123,6 @@ AFRAME.registerComponent("location-checker", {
         this.targetAddressLocation.lon
       );
 
-      // (디버깅용) 콘솔에 남은 거리 표시
       console.log(`Distance to target: ${distance.toFixed(2)} meters`);
 
       if (distance <= this.data.proximityThreshold) {
@@ -301,192 +303,5 @@ AFRAME.registerComponent("toss-integration", {
       });
   },
 });
-// 'use strict';
-
-// //Make navbar transparent when it is on the top
-// const navbar= document.querySelector('#navbar');
-// const navbarHeight= navbar.getBoundingClientRect().height;
-// document.addEventListener('scroll', () => {
-	
-// 	if(window.scrollY > navbarHeight){
-// 		navbar.classList.add('navbar--dark')
-// 	}else{
-// 		navbar.classList.remove('navbar--dark')
-// 	}
-// });
-
-
-// //Handing scrolling when tapping in the navbar menu.
-
-// const navbarMenu = document.querySelector('.navbar__menu');
-// navbarMenu.addEventListener('click', (event) => {
-//   const target = event.target;
-//   const link = target.dataset.link;
-//   if (link == null) {
-//     return;
-//   }
-//   navbarMenu.classList.remove('open');
-//   scrollIntoView(link);
-	
-// });
-
-
-// //Handle click on 'contact me' button on home
-// const homeContactBtn = document.querySelector('.home__contact');
-// homeContactBtn.addEventListener('click', () =>{
-// 	scrollIntoView('#contact');
-	
-// });
-
-// //Navbar toogle button for small screen
-// const navbarToggleBtn = document.querySelector('.navbar__toggle-btn');
-//  navbarToggleBtn.addEventListener('click', () =>{
-// 	navbarMenu.classList.toggle('open');
-	
-// });
-
-
-
-
-// //Make home slowly fade to transparent as the wondow window scrolls down
-// const home= document.querySelector('.home__container');
-// const homeHeight= home.getBoundingClientRect().height;
-// document.addEventListener('scroll', () => {
-// 	home.style.opacity=1- window.scrollY/ homeHeight;
-// });
-
-
-
-// //Show arrow up botton when scrolling down
-// document.addEventListener('scroll', () => {
-// const arrowUp = document.querySelector('.arrow-up');
-// 	if(window.scrollY > navbarHeight/2){
-// 		arrowUp.classList.add('visible')
-// 	}else{
-// 		arrowUp.classList.remove('visible')
-// 	}
-// });
-
-// //raise up to home when click arrow up botton
-// //Handle click on the arrow up botton
-// const arrowUpBtn = document.querySelector('.arrow-up');
-// arrowUpBtn.addEventListener('click', () =>{
-// 	scrollIntoView('#home');
-	
-// });
-
-// //Display(show) content when clicking on menu
-
-// const workBtnContainer= document.querySelector('.work_categories');
-// const projectContainer= document.querySelector('.work_projects');
-// const projects = document.querySelectorAll('.project');
-// workBtnContainer.addEventListener('click', (e) => {
-//   	const filter = e.target.dataset.filter || e.target.parentNode.dataset.filter;
-// 	if (filter==null){
-// 		return;
-// 	}
-	
-// //Remove selection from the previous item and select the new one
-
-// 	const active= document.querySelector('.categorie__btn.selected');
-// 	active.classList.remove('selected');
-// 	const target = e.target.Nodename ==='BUTTON' ? e.target : e.target.parantNode;
-// 	e.target.classList.add('selected');
-	
-	
-	
-	
-// 	projectContainer.classList.add('anim-out');
-	
-// 	setTimeout(()  =>{
-		
-// 		projects.forEach( (project) => {
-// 			if(filter === '*' || filter === project.dataset.type ){
-// 			project.classList.remove('invisible');
-// 			}else{
-// 				project.classList.add('invisible');
-// 			}
-// 		});
-// 		projectContainer.classList.remove('anim-out');
-// 	}, 300);
-// });
-
-
-
-
-		
-
-// 	const sectionIds = ['#home','#about','#skills','#work','#testimonials','#contact'];
-// 	const sections = sectionIds.map(id => document.querySelector(id));
-// 	const navItems = sectionIds.map(id => document.querySelector(`[data-link="${id}"]`));
-	
-	
-// 	let selectedNavIndex=0;
-// 	let selectedNavItem=navItems[0];
-	
-// 	function selectNavItem(selected){
-// 				selectedNavItem.classList.remove('active');
-// 				selectedNavItem =selected;
-// 				selectedNavItem.classList.add('active');
-// 	}
-	
-
-
-// 	function scrollIntoView(selector) {
-// 	const scrollTo = document.querySelector(selector);
-// 	scrollTo.scrollIntoView({ behavior: 'smooth' });
-// 	selectNavItem(navItems[sectionIds.indexOf(selector)]);
-		
-// }
-		
-
-
-
-// 	const observerOption={
-// 	root:null,
-// 	rootMargin:'0px',
-// 	threshold:0.3,
-// };
-
-
-
-
-// 		const observerCallback =(entries, observer) => {
-// 			 entries.forEach(entry => {
-// 			if(!entry.isIntersecting && entry.intersectionRatio>0){
-// 				const index=sectionIds.indexOf(`#${entry.target.id}`)
-
-// 				if(entry.boundingClientRect.y<0){
-// 					selectedNavIndex=index+1;
-// 				}
-// 				else{
-// 					selectedNavIndex=index-1;
-// 				}
-// 			}
-				
-
-// 			});
-// 		};
-
-
-		
-
-// 		const observer = new IntersectionObserver(observerCallback,observerOption);
-		
-// 		sections.forEach(section => observer.observe(section));
-		
-
-	
-// 		window.addEventListener('wheel', () => {
-//   if (window.scrollY === 0) {
-//     selectedNavIndex = 0;
-//   } else if (
-//     window.scrollY + window.innerHeight ===
-//     document.body.clientHeight
-//   ) {
-//     selectedNavIndex = navItems.length - 1;
-//   }
-//   selectNavItem(navItems[selectedNavIndex]);
-// });
 
 	
