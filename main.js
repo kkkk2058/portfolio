@@ -1,67 +1,114 @@
 /* global AFRAME, THREE */
 
 /**
- * 1. LocationService (GPS 위치 관리자)
- * (이전 코드와 동일)
+ * 1. LocationService (GPS 위치 관리자) - [ 수정됨 ]
+ * 10초 이내에 실제 GPS 신호를 받지 못하면,
+ * 'simulationCoords'에 설정된 가짜 위치로 시뮬레이션 모드를 시작합니다.
  */
 AFRAME.registerComponent("location-service", {
   init: function () {
     this.hasLocation = false;
     this.watchId = null;
-    console.log("LocationService: Initializing...");
+    this.simulationActive = false;
+    console.log("LocationService: Trying to get real GPS signal...");
 
+    // --- 시뮬레이션을 위한 가짜 사용자 위치 ---
+    // (테스트를 위해 '목표 주소'와 동일하게 설정)
+    this.simulationCoords = {
+      lat: 37.4728, // [임시] 금하로24나길 48 근처 좌표
+      lon: 126.9080, // [임시] 금하로24나길 48 근처 좌표
+    };
+    // ------------------------------------
+
+    // 10초 후 시뮬레이션 모드 강제 실행 (실제 GPS가 실패할 경우)
+    const simulationTimeout = setTimeout(() => {
+      if (!this.hasLocation) {
+        console.warn(
+          "LocationService: Real GPS timeout. Activating SIMULATION MODE."
+        );
+        this.simulationActive = true;
+        this.useSimulationData();
+      }
+    }, 10000); // 10초 타임아웃
+
+    // 1. 실제 GPS 시도
     this.watchId = navigator.geolocation.watchPosition(
       (pos) => {
+        // 실제 GPS 성공!
+        if (this.simulationActive) return; // 시뮬레이션이 이미 켜졌으면 무시
+
+        clearTimeout(simulationTimeout); // 시뮬레이션 타임아웃 취소
+        this.hasLocation = true;
+
         const coords = {
           lat: pos.coords.latitude,
           lon: pos.coords.longitude,
         };
-        if (!this.hasLocation) {
-          this.hasLocation = true;
-          const loadingText = document.getElementById("loadingText");
-          if (loadingText) loadingText.setAttribute("visible", false);
-          console.log("LocationService: GPS Signal Acquired!");
-        }
+
+        const loadingText = document.getElementById("loadingText");
+        if (loadingText) loadingText.setAttribute("visible", false);
+        console.log("LocationService: Real GPS Signal Acquired!");
+
         this.el.emit("gps-updated", { coords: coords }, false);
       },
       (err) => {
-        console.error("LocationService Error:", err.message);
-        const loadingText = document.getElementById("loadingText");
-        if (loadingText)
-          loadingText.setAttribute("value", `Error: ${err.message}`);
+        // 실제 GPS 오류 (스크린샷의 오류들)
+        if (this.simulationActive) return; // 시뮬레이션이 켜졌으면 무시
+        console.error("LocationService Error (as seen in screenshot):", err.message);
+        // 타임아웃이 시뮬레이션을 처리하도록 둡니다.
       },
-      { enableHighAccuracy: true, timeout: 20000, maximumAge: 1000 }
+      { enableHighAccuracy: true, timeout: 5000, maximumAge: 0 }
     );
   },
+
+  // 2. 시뮬레이션 데이터 사용
+  useSimulationData: function () {
+    this.hasLocation = true; // 위치 잡힘으로 처리
+
+    const loadingText = document.getElementById("loadingText");
+    if (loadingText) {
+      loadingText.setAttribute("value", "SIMULATION MODE ACTIVE");
+      loadingText.setAttribute("color", "#FFD700"); // 노란색으로 표시
+    }
+
+    const fakeCoords = this.simulationCoords;
+    console.log(
+      `LocationService: Emitting FAKE location: ${fakeCoords.lat}, ${fakeCoords.lon}`
+    );
+
+    // 3초마다 가짜 위치를 계속 전송 (watchPosition 흉내)
+    setInterval(() => {
+      this.el.emit("gps-updated", { coords: fakeCoords }, false);
+    }, 3000);
+  },
+
   remove: function () {
     if (this.watchId) navigator.geolocation.clearWatch(this.watchId);
   },
 });
 
 /**
- * 2. LocationChecker (특정 주소 근접 확인)
- * 'merchant-manager'를 'location-checker'로 이름을 변경했습니다.
+ * 2. LocationChecker (특정 주소 근접 확인) - [ 수정됨 ]
+ * '금하로24나길 48' (관악산 신도브래뉴)의 실제 좌표를 하드코딩합니다.
  */
 AFRAME.registerComponent("location-checker", {
   schema: {
-    proximityThreshold: { type: "number", default: 100 }, // '근처'로 판단할 거리 (미터)
+    proximityThreshold: { type: "number", default: 100 }, // 100미터 반경
   },
   init: function () {
     this.isUserNearby = false;
 
-    // ================== [ 중요!! ] ==================
-    // '금하로24나길 48'의 실제 GPS 좌표를 여기에 입력하세요.
-    // (현재는 임시로 서울역 좌표가 들어가 있습니다)
-    // 예: lat: 37.47915, lon: 127.9059
+    // ================== [ 목표 주소 좌표 ] ==================
+    // '금하로24나길 48' (서울 금천구 시흥동 1017)의 실제 좌표입니다.
     this.targetAddressLocation = {
       name: "금하로24나길 48 (목표 지점)",
-      lat: 37.5547, // (임시) 서울역 위도
-      lon: 126.9704, // (임시) 서울역 경도
+      lat: 37.47915,
+      lon: 126.9059,
     };
-    // ===============================================
+    // ======================================================
 
     console.log(
-      `LocationChecker: Watching for location near ${this.targetAddressLocation.name}`
+      `LocationChecker: Watching for location near ${this.targetAddressLocation.name} (${this.targetAddressLocation.lat}, ${this.targetAddressLocation.lon})`
     );
 
     this.el.sceneEl.addEventListener("gps-updated", (event) => {
@@ -73,6 +120,7 @@ AFRAME.registerComponent("location-checker", {
         this.targetAddressLocation.lon
       );
 
+      // (디버깅용) 콘솔에 남은 거리 표시
       console.log(`Distance to target: ${distance.toFixed(2)} meters`);
 
       if (distance <= this.data.proximityThreshold) {
@@ -110,7 +158,7 @@ AFRAME.registerComponent("location-checker", {
 
 /**
  * 3. ARSpawnManager (AR 쿠폰 생성기)
- * 'toss-coupon' 컴포넌트를 가진 엔티티를 생성합니다.
+ * (이전 코드와 동일)
  */
 AFRAME.registerComponent("ar-spawn-manager", {
   schema: {
@@ -119,31 +167,25 @@ AFRAME.registerComponent("ar-spawn-manager", {
   },
   init: function () {
     this.spawnedItems = [];
-
     this.el.addEventListener("user-near-target", () => {
       console.log("ARSpawnManager: Spawning coupons...");
       this.spawnCoupons();
     });
-
     this.el.addEventListener("user-far-target", () => {
       console.log("ARSpawnManager: Clearing coupons...");
       this.clearCoupons();
     });
   },
-
   spawnCoupons: function () {
     this.clearCoupons();
     const scene = this.el.sceneEl;
-
     for (let i = 0; i < this.data.maxItems; i++) {
       const angle = Math.random() * 2 * Math.PI;
       const distance = Math.random() * this.data.spawnRadius + 5;
       const x = Math.cos(angle) * distance;
       const z = Math.sin(angle) * distance;
       const y = Math.random() * 2 + 1;
-
       const coupon = document.createElement("a-entity");
-      // 'toss-point' 대신 'toss-coupon' 컴포넌트를 사용합니다.
       coupon.setAttribute("toss-coupon", "");
       coupon.setAttribute("class", "clickable");
       coupon.setAttribute("gps-projected-entity-place", {
@@ -151,12 +193,10 @@ AFRAME.registerComponent("ar-spawn-manager", {
         longitude: 0,
       });
       coupon.object3D.position.set(x, y, z);
-
       scene.appendChild(coupon);
       this.spawnedItems.push(coupon);
     }
   },
-
   clearCoupons: function () {
     this.spawnedItems.forEach((item) => item.parentNode?.removeChild(item));
     this.spawnedItems = [];
@@ -165,20 +205,16 @@ AFRAME.registerComponent("ar-spawn-manager", {
 
 /**
  * 4. TossCoupon (3D 쿠폰 정의)
- * 3D 모델 대신 텍스처가 적용된 2D 평면(a-image)을 사용합니다.
+ * (이전 코드와 동일)
  */
 AFRAME.registerComponent("toss-coupon", {
   init: function () {
-    // 3D 모델 대신 'a-image'를 사용하여 2D 쿠폰 이미지를 띄웁니다.
-    // '#coupon-texture'는 index.html의 a-assets에서 로드한 이미지 ID입니다.
     this.el.setAttribute("geometry", { primitive: "plane", width: 1.5, height: 1 });
     this.el.setAttribute("material", {
       src: "#coupon-texture",
       transparent: true,
-      shader: "flat", // 그림자 영향 안 받음
+      shader: "flat",
     });
-
-    // 회전 애니메이션
     this.el.setAttribute("animation", {
       property: "rotation",
       to: "0 360 0",
@@ -186,72 +222,60 @@ AFRAME.registerComponent("toss-coupon", {
       dur: 4000,
       easing: "linear",
     });
-
-    // 'look-at' 컴포넌트를 사용하여 항상 사용자를 바라보게 함
     this.el.setAttribute("look-at", "[gps-projected-camera]");
   },
 });
 
 /**
  * 5. InteractionManager (터치 및 수집)
- * (이전 코드와 동일 - .clickable 클래스를 감지)
+ * (이전 코드와 동일)
  */
 AFRAME.registerComponent("interaction-manager", {
   init: function () {
     this.sceneEl = this.el.sceneEl;
     this.cameraEl = this.sceneEl.camera.el;
-    
     this.cameraEl.setAttribute("cursor", "rayOrigin: mouse; fuse: false;");
     this.cameraEl.setAttribute("raycaster", "objects: .clickable;");
-
     console.log("InteractionManager: Ready to collect coupons.");
-    
     this.cameraEl.addEventListener("click", () => {
-        const intersectedEl = this.cameraEl.components.raycaster?.intersectedEls[0];
-        
-        if (intersectedEl && intersectedEl.classList.contains("clickable")) {
-            this.collectItem(intersectedEl);
-        }
+      const intersectedEl = this.cameraEl.components.raycaster?.intersectedEls[0];
+      if (intersectedEl && intersectedEl.classList.contains("clickable")) {
+        this.collectItem(intersectedEl);
+      }
     });
   },
-  
   collectItem: function (itemEl) {
     console.log("InteractionManager: Coupon Collected!");
-
     itemEl.setAttribute("animation", {
       property: "scale",
       to: "0 0 0",
       dur: 300,
       easing: "easeInQuad",
     });
-
     setTimeout(() => {
       itemEl.parentNode.removeChild(itemEl);
     }, 300);
-
-    // 수집 이벤트 발생 (쿠폰이므로 1개 수집)
     this.el.emit("coupon-collected", { couponId: "TOSS-1000" }, false);
   },
 });
 
 /**
  * 6. TossIntegration (서버 연동 시뮬레이션)
- * 'coupon-collected' 이벤트를 수신합니다.
+ * (이전 코드와 동일)
  */
 AFRAME.registerComponent("toss-integration", {
   init: function () {
     this.collectionApiUrl = "https://your-backend-server.com/api/collect-coupon";
-    this.tossUserId = "SIMULATED_USER_ID_789"; 
-
+    this.tossUserId = "SIMULATED_USER_ID_789";
     this.el.addEventListener("coupon-collected", (event) => {
       const couponId = event.detail.couponId;
-      console.log(`TossIntegration: Notifying server of coupon [${couponId}] collected...`);
+      console.log(
+        `TossIntegration: Notifying server of coupon [${couponId}] collected...`
+      );
       this.notifyServer(couponId);
     });
   },
-
   notifyServer: function (couponId) {
-    // (시뮬레이션) fetch API를 사용하여 우리 백엔드 서버에 알림
     fetch(this.collectionApiUrl, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
@@ -261,23 +285,22 @@ AFRAME.registerComponent("toss-integration", {
       }),
     })
       .then((response) => {
-        if (!response.ok) throw new Error(`Server responded ${response.status}`);
+        if (!response.ok)
+          throw new Error(`Server responded ${response.status}`);
         return response.json();
       })
       .then((data) => {
         console.log("TossIntegration: Server notified successfully!", data);
-        alert("쿠폰이 발급되었습니다!"); // 사용자에게 피드백
+        alert("쿠폰이 발급되었습니다!");
       })
       .catch((error) => {
         console.warn(
           `TossIntegration: Server notification simulation (failed as expected): ${error.message}`
         );
-        // 실제 운영 시에는 여기서 에러 처리를 해야 함
-        alert("쿠폰 발급 완료! (Test Mode)"); // 시뮬레이션이므로 성공으로 간주
+        alert("쿠폰 발급 완료! (Test Mode)");
       });
   },
 });
-
 // 'use strict';
 
 // //Make navbar transparent when it is on the top
