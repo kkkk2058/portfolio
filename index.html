@@ -13,6 +13,7 @@
     <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo=" crossorigin=""></script>
     
     <!-- three.js (3D/AR) - ES Module -->
+    <!-- [수정] WebXR이 차단되어 three.js 및 ARButton 관련 import를 제거/주석 처리합니다.
     <script async src="https://unpkg.com/es-module-shims@1.10.0/dist/es-module-shims.js"></script>
     <script type="importmap">
     {
@@ -22,67 +23,53 @@
       }
     }
     </script>
-
-    <!-- Chosen Palette: Toss-Inspired Blue & Map UI -->
+    -->
     <!-- Application Structure Plan: 이 앱은 '지도 탐색'과 'AR 경험'이라는 두 가지 핵심 상태를 갖습니다. 1) '지도 화면(screen-map)'이 기본이며, Leaflet.js를 사용해 사용자와 가맹점 위치를 실시간 표시합니다. 2) Geolocation API로 거리를 계산하여 20m 이내일 때 'AR 시작' 버튼을 활성화합니다. 3) 'AR 시작' 버튼 클릭 시, 'AR 오버레이(screen-ar-overlay)'가 활성화되고 WebXR 세션이 시작됩니다. 4) three.js가 AR 공간에 3D 객체를 렌더링하고, 터치(Raycaster)로 객체 획득 상호작용을 처리합니다. 이 구조는 GPS 기반 탐색과 몰입형 AR 경험을 자연스럽게 연결합니다. -->
     <!-- Visualization & Content Choices: 지도: 정보(위치) -> 목표(탐색) -> Leaflet.js 맵 -> 사용자가 실제 세계에서 가맹점과의 거리/방향을 직관적으로 인지 -> Leaflet.js + Geolocation API. | AR 오브젝트: 정보(리워드) -> 목표(획득) -> 3D TorusKnot(도넛) -> 사용자가 카메라 뷰에서 리워드를 시각적으로 발견하고 터치로 획득 -> three.js + WebXR API. 이 방식들은 실제 API를 사용하여 기획안의 핵심 기능을 프로토타입으로 구현합니다. -->
     <!-- CONFIRMATION: NO SVG graphics used. NO Mermaid JS used. -->
 
     <style>
-        body, html {
-            overscroll-behavior: none;
-            -webkit-font-smoothing: antialiased;
-            -moz-osx-font-smoothing: grayscale;
-            width: 100%;
-            height: 100%;
-            margin: 0;
-            padding: 0;
-            overflow: hidden;
-        }
-        #app-container {
-            position: relative;
-            width: 100%;
-            height: 100%;
-            background: #f0f0f0;
-        }
-        .screen {
-            position: absolute;
-            top: 0;
-            left: 0;
-            width: 100%;
-            height: 100%;
-            display: none;
-            flex-direction: column;
-        }
-        .screen.active {
-            display: flex;
-        }
-        #map {
-            width: 100%;
-            flex-grow: 1; /* 지도가 남은 공간을 모두 차지 */
-            z-index: 10;
-        }
-        #info-panel {
-            position: absolute;
-            bottom: 0;
-            left: 0;
-            right: 0;
-            z-index: 20;
-        }
-        /* AR 캔버스는 three.js가 자동으로 전체 화면으로 만듭니다 */
-        #screen-ar-overlay {
-            z-index: 30;
-            pointer-events: none; /* AR 씬 터치를 방해하지 않도록 */
-        }
-        #screen-ar-overlay > * {
-            pointer-events: auto; /* 버튼 등 UI 요소는 터치 가능하도록 */
-        }
+        /* ... existing style code ... */
         #modal-reward-content.active {
             transform: scale(1);
             opacity: 1;
         }
         .leaflet-control-attribution {
             display: none; /* 지도 저작권 표시 숨김 (테스트용) */
+        }
+
+        /* [추가] 시뮬레이션 AR 객체를 위한 CSS (Mockup에서 가져옴) */
+        @keyframes float {
+            0%, 100% {
+                transform: translateY(0);
+            }
+            50% {
+                transform: translateY(-20px) scale(1.05);
+            }
+        }
+
+        .ar-object {
+            position: absolute;
+            width: 72px;
+            height: 72px;
+            background-color: #1B64F2; /* Toss Blue */
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: white;
+            font-size: 28px;
+            font-weight: 800;
+            border: 4px solid white;
+            box-shadow: 0 10px 25px rgba(27, 100, 242, 0.5), 0 0 0 10px rgba(255, 255, 255, 0.1);
+            cursor: pointer;
+            animation: float 4s ease-in-out infinite;
+            transition: all 0.3s ease;
+            z-index: 40; /* 오버레이 UI 요소 */
+        }
+
+        .ar-object:hover {
+            transform: scale(1.15) !important;
         }
     </style>
 </head>
@@ -111,11 +98,16 @@
         </div>
 
         <!-- Screen 3: AR UI Overlay -->
-        <div id="screen-ar-overlay" class="screen justify-between p-4">
-            <button id="btn-close-ar" class="bg-black bg-opacity-40 text-white w-12 h-12 rounded-full text-2xl font-bold leading-10 text-center">
+        <div id="screen-ar-overlay" class="screen justify-between p-4 bg-slate-800"> <!-- [수정] 시뮬레이션을 위해 배경색 추가 -->
+            <button id="btn-close-ar" class="bg-black bg-opacity-40 text-white w-12 h-12 rounded-full text-2xl font-bold leading-10 text-center z-50">
                 X
             </button>
             
+            <!-- [추가] 시뮬레이션 AR 객체 컨테이너 -->
+            <div id="ar-object-container-simulated" class="absolute inset-0 w-full h-full z-30">
+                <!-- 시뮬레이션 객체들이 여기에 생성됩니다. -->
+            </div>
+
             <!-- AR 획득 모달 -->
             <div id="modal-reward" class="absolute inset-0 hidden items-center justify-center bg-black bg-opacity-60 z-50">
                 <div id="modal-reward-content" class="bg-white rounded-2xl shadow-2xl w-full max-w-sm text-center p-8 m-4 transform scale-0 opacity-0 transition-all duration-300">
@@ -141,8 +133,9 @@
     </div>
 
     <script type="module">
-        import * as THREE from 'three';
-        import { ARButton } from 'three/addons/webxr/ARButton.js';
+        // [수정] three.js import 제거
+        // import * as THREE from 'three';
+        // import { ARButton } from 'three/addons/webxr/ARButton.js';
 
         const screens = {
             loading: document.getElementById('screen-loading'),
@@ -163,9 +156,10 @@
         let userLatLng = null; // [lat, lng]
         const activationDistance = 20; // 20m 이내
 
-        let camera, scene, renderer, controller;
-        let arObject;
-        let xrSession = null;
+        // [수정] WebXR 관련 변수 제거
+        // let camera, scene, renderer, controller;
+        // let arObject;
+        // let xrSession = null;
 
         function showScreen(screenId) {
             Object.values(screens).forEach(screen => screen.classList.remove('active'));
@@ -200,29 +194,36 @@
             showScreen('map');
             updateDistance();
             
-            navigator.geolocation.watchPosition(updateUserPosition, handleLocationError, { enableHighAccuracy: true });
+            // navigator.geolocation.watchPosition(updateUserPosition, handleLocationError, { enableHighAccuracy: true });
+            // [수정] Geolocation API가 플랫폼 정책으로 차단되어 watchPosition을 주석 처리합니다.
         }
 
         function updateUserPosition(pos) {
+            // [수정] watchPosition이 호출되지 않으므로 이 함수의 내용은 실행되지 않습니다.
+            /*
             userLatLng = [pos.coords.latitude, pos.coords.longitude];
             userMarker.setLatLng(userLatLng);
             map.panTo(userLatLng); // 사용자를 따라 지도 이동
             updateDistance();
+            */
         }
 
         function updateDistance() {
             if (!userLatLng || !merchantLatLng) return;
 
-            const dist = haversineDistance(userLatLng, merchantLatLng);
-            infoPanel.textContent = `가맹점까지 약 ${dist.toFixed(0)}m 남았습니다.`;
+            // const dist = haversineDistance(userLatLng, merchantLatLng);
+            // infoPanel.textContent = `가맹점까지 약 ${dist.toFixed(0)}m 남았습니다.`;
 
-            if (dist <= activationDistance) {
+            // [수정] Geolocation API가 차단되어, 테스트를 위해 거리를 무시하고 항상 활성화합니다.
+            infoPanel.textContent = `가맹점까지 약 10m 남았습니다. (시뮬레이션)`;
+
+            // if (dist <= activationDistance) {
                 arButton.disabled = false;
-                arButton.textContent = 'AR로 포인트 잡기 (활성화!)';
-            } else {
-                arButton.disabled = true;
-                arButton.textContent = 'AR로 포인트 잡기';
-            }
+                arButton.textContent = 'AR로 포인트 잡기 (시뮬레이션)';
+            // } else {
+            //    arButton.disabled = true;
+            //    arButton.textContent = 'AR로 포인트 잡기';
+            // }
         }
 
         function handleLocationError(error) {
@@ -231,143 +232,70 @@
         }
 
         // --- AR Logic (Three.js + WebXR) ---
+        // [수정] WebXR 로직을 시뮬레이션 로직으로 변경
 
         async function initXR() {
-            if (!('xr' in navigator)) {
-                showScreen('unsupported');
-                return;
-            }
-            
-            const isSupported = await navigator.xr.isSessionSupported('immersive-ar');
-            if (!isSupported) {
-                showScreen('unsupported');
-                return;
-            }
-
-            renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true });
-            renderer.setPixelRatio(window.devicePixelRatio);
-            renderer.setSize(window.innerWidth, window.innerHeight);
-            renderer.xr.enabled = true;
-            // AR 캔버스를 body에 추가하지만, 보이지 않게 처리. 오버레이가 UI 담당.
-            renderer.domElement.style.position = 'absolute';
-            renderer.domElement.style.top = '0';
-            renderer.domElement.style.left = '0';
-            renderer.domElement.style.zIndex = '25';
-            document.body.appendChild(renderer.domElement);
-
-            scene = new THREE.Scene();
-            camera = new THREE.PerspectiveCamera(70, window.innerWidth / window.innerHeight, 0.01, 20);
-
-            const light = new THREE.HemisphereLight(0xffffff, 0xbbbbff, 3);
-            light.position.set(0.5, 1, 0.25);
-            scene.add(light);
-            
-            // 컨트롤러 (터치 감지용)
-            controller = renderer.xr.getController(0);
-            controller.addEventListener('select', onSelect);
-            scene.add(controller);
-
+            // [수정] WebXR 지원 확인 로직 제거. 대신 이벤트 리스너만 연결
             arButton.addEventListener('click', activateXR);
             closeArButton.addEventListener('click', endXR);
             claimRewardButton.addEventListener('click', hideModal);
         }
 
         async function activateXR() {
-            try {
-                xrSession = await navigator.xr.requestSession('immersive-ar', {
-                    requiredFeatures: ['hit-test'] // 평면 인식을 사용하면 좋지만, 없어도 됨
-                });
-                onSessionStarted(xrSession);
-            } catch (e) {
-                console.error("AR 세션 시작 실패:", e);
-                showScreen('unsupported');
-            }
-        }
-        
-        function onSessionStarted(session) {
+            // [수정] 실제 XR 세션 요청 대신, 시뮬레이션 화면 표시
             showScreen('arOverlay');
-            session.addEventListener('end', onSessionEnded);
-            renderer.xr.setReferenceSpaceType('local');
-            renderer.xr.setSession(session);
-            renderer.setAnimationLoop(onXRFrame);
-            spawnArObject();
-        }
-
-        function onSessionEnded() {
-            xrSession = null;
-            renderer.setAnimationLoop(null);
-            showScreen('map');
-            // AR 객체 정리
-            if (arObject) {
-                scene.remove(arObject);
-                arObject = null;
-            }
+            spawnSimulatedArObjects(5); // 시뮬레이션 객체 생성
         }
         
         function endXR() {
-            if (xrSession) {
-                xrSession.end();
-            }
+            // [수정] XR 세션 종료 대신, 시뮬레이션 화면 닫기
+            showScreen('map');
+            // 시뮬레이션 객체 정리
+            const container = document.getElementById('ar-object-container-simulated');
+            if (container) container.innerHTML = '';
         }
 
-        function onXRFrame(time, frame) {
-            const referenceSpace = renderer.xr.getReferenceSpace();
-            const session = renderer.xr.getSession();
-            
-            if (!referenceSpace) return;
-            
-            const pose = frame.getViewerPose(referenceSpace);
-            if (pose) {
-                camera.matrix.fromArray(pose.transform.matrix);
-                camera.matrix.decompose(camera.position, camera.quaternion, camera.scale);
-                camera.updateMatrixWorld(true);
-            }
-            
-            // AR 객체 애니메이션
-            if (arObject) {
-                arObject.rotation.y += 0.01;
-                arObject.rotation.x += 0.005;
-            }
+        // [추가] 시뮬레이션 객체 생성 함수 (Mockup에서 가져옴)
+        function spawnSimulatedArObjects(count) {
+            const container = document.getElementById('ar-object-container-simulated');
+            container.innerHTML = ''; 
+            const rewards = [
+                { name: '1,000 포인트', icon: 'P' },
+                { name: '500원 쿠폰', icon: 'C' },
+                { name: '100 포인트', icon: 'P' },
+                { name: '2,000 포인트', icon: 'P' },
+                { name: '무료 커피 쿠폰', icon: 'C' }
+            ];
 
-            renderer.render(scene, camera);
-        }
+            for (let i = 0; i < count; i++) {
+                const reward = rewards[i % rewards.length];
+                const arObject = document.createElement('div');
+                arObject.className = 'ar-object';
+                arObject.innerHTML = `<span>${reward.icon}</span>`;
+                arObject.dataset.rewardName = reward.name;
+                
+                const x = Math.random() * 80 + 10; 
+                const y = Math.random() * 70 + 15;
+                
+                arObject.style.left = `${x}%`;
+                arObject.style.top = `${y}%`;
+                // transform 속성은 @keyframes에서 관리하므로 여기서 제외
+                arObject.style.animationDelay = `${Math.random() * -4}s`;
 
-        function spawnArObject() {
-            const geometry = new THREE.TorusKnotGeometry(0.2, 0.05, 100, 16);
-            const material = new THREE.MeshPhongMaterial({ 
-                color: 0x1B64F2, 
-                shininess: 100 
-            });
-            arObject = new THREE.Mesh(geometry, material);
-            
-            // 카메라 앞 2m, 약간 아래에 배치
-            arObject.position.set(0, -0.2, -2);
-            arObject.userData.rewardName = '1,000 포인트'; // 데이터 저장
-            scene.add(arObject);
-        }
-        
-        function onSelect(event) {
-            if (!arObject) return;
-
-            const raycaster = new THREE.Raycaster();
-            const tempMatrix = new THREE.Matrix4();
-            
-            tempMatrix.identity().extractRotation(controller.matrixWorld);
-            raycaster.ray.origin.setFromMatrixPosition(controller.matrixWorld);
-            raycaster.ray.direction.set(0, 0, -1).applyMatrix4(tempMatrix);
-            
-            const intersects = raycaster.intersectObject(arObject);
-
-            if (intersects.length > 0) {
-                captureObject(intersects[0].object);
+                arObject.addEventListener('click', (e) => {
+                    captureObject(e.currentTarget); // 시뮬레이션 객체 캡처
+                });
+                
+                container.appendChild(arObject);
             }
         }
         
-        function captureObject(object) {
-            document.getElementById('reward-name').textContent = object.userData.rewardName;
+        // [수정] captureObject가 DOM 요소를 받도록 수정
+        function captureObject(element) {
+            const rewardName = element.dataset.rewardName;
+            document.getElementById('reward-name').textContent = rewardName;
             showModal();
-            scene.remove(object);
-            arObject = null; // 잡았으니 null 처리
+            element.remove(); // 잡았으니 DOM에서 제거
         }
 
         function showModal() {
@@ -381,13 +309,20 @@
             modalRewardContent.classList.remove('active');
             setTimeout(() => {
                 modalReward.style.display = 'none';
-                // 모든 객체를 잡았으면 AR 종료
-                if (!arObject) {
+                // [수정] 모든 시뮬레이션 객체를 잡았는지 확인
+                const container = document.getElementById('ar-object-container-simulated');
+                if (container && container.children.length === 0) {
                     endXR();
                 }
             }, 300);
         }
 
+        // [삭제] 불필요해진 WebXR 관련 함수들
+        // function onSessionStarted(session) { ... }
+        // function onSessionEnded() { ... }
+        // function onXRFrame(time, frame) { ... }
+        // function spawnArObject() { ... }
+        // function onSelect(event) { ... }
 
         // --- Utility Functions ---
 
@@ -442,3 +377,5 @@
     </script>
 </body>
 </html>
+
+
