@@ -1,49 +1,78 @@
 <!DOCTYPE html>
-<html>
+<html lang="ko">
   <head>
-    <meta charset="utf-8" />
-    <meta http-equiv="X-UA-Compatible" content="IE=edge" />
-    <title>AR Coupon Hunter (WebXR)</title>
+    <meta charset="UTF-8" />
     <meta
       name="viewport"
-      content="width=device-width, initial-scale=1, user-scalable=no"
+      content="width=device-width, initial-scale=1.0, user-scalable=no"
     />
-    <script src="https://aframe.io/releases/1.5.0/aframe.min.js"></script>
-    <script src="https://raw.githack.com/AR-js-org/AR.js/master/aframe/build/aframe-ar-nft.js"></script>
+    <title>웹 Geofence 프로토타입</title>
     <script src="./main.js"></script>
+
+    <style>
+      body {
+        font-family: -apple-system, BlinkMacSystemFont, "Apple SD Gothic Neo",
+          "Pretendard", Roboto, "Noto Sans KR", "Segoe UI", "Malgun Gothic",
+          "Apple Color Emoji", "Segoe UI Emoji", "Segoe UI Symbol", sans-serif;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        height: 100vh;
+        margin: 0;
+        background-color: #f0f2f5;
+        color: #333;
+      }
+      #status-card {
+        background: #ffffff;
+        padding: 20px;
+        border-radius: 12px;
+        box-shadow: 0 4px 12px rgba(0, 0, 0, 0.05);
+        text-align: center;
+        margin-bottom: 20px;
+      }
+      #status-title {
+        font-weight: 600;
+        font-size: 1.2rem;
+        color: #0075ff; /* 토스 블루 */
+      }
+      #status-message {
+        font-size: 0.9rem;
+        color: #555;
+        margin-top: 8px;
+        min-height: 40px;
+      }
+      #coupon-container {
+        /* 쿠폰은 기본적으로 숨겨져 있습니다. */
+        display: none;
+        background: linear-gradient(135deg, #0075ff, #005fcc);
+        border-radius: 16px;
+        padding: 30px;
+        text-align: center;
+        color: white;
+        box-shadow: 0 8px 20px rgba(0, 117, 255, 0.3);
+      }
+      #coupon-title {
+        font-size: 1.5rem;
+        font-weight: bold;
+        margin-bottom: 10px;
+      }
+      #coupon-desc {
+        font-size: 1rem;
+      }
+    </style>
   </head>
+  <body>
+    <div id="status-card">
+      <div id="status-title">위치 확인 중...</div>
+      <div id="status-message">
+        집 근처인지 확인하기 위해 GPS 신호를 찾고 있습니다...
+      </div>
+    </div>
 
-  <body style="margin: 0; overflow: hidden">
-    <a-assets>
-      <img
-        id="coupon-texture"
-        src="https://i.imgur.com/gTfWfD7.png" 
-        crossorigin="anonymous"
-      />
-    </a-assets>
-
-    <a-scene
-      vr-mode-ui="enabled: false"
-      arjs="sourceType: webcam; trackingMethod: best; debugUIEnabled: false;"
-      gps-projected-camera
-      renderer="logarithmicDepthBuffer: true"
-    >
-      <a-entity
-        id="manager"
-        location-service
-        location-checker
-        ar-spawn-manager
-        interaction-manager
-        toss-integration
-      ></a-entity>
-
-      <a-text
-        id="loadingText"
-        value="Getting GPS signal..."
-        position="0 -0.5 -2"
-        align="center"
-        color="#FFFFFF"
-      ></a-text>
-    </a-scene>
+    <div id="coupon-container">
+      <div id="coupon-title">🎉 쿠폰 도착!</div>
+      <div id="coupon-desc">집 근처 도착을 환영합니다!</div>
+    </div>
   </body>
 </html>
