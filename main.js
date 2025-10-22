@@ -12,8 +12,8 @@ function initLocationService() {
   // 2. 목표 지점 설정 (금하로24나길 48)
   const targetLocation = {
     name: "금하로24나길 48",
-    lat: 37.47281,
-    lon: 126.90805,
+    lat: 37.47915,
+    lon: 126.9059,
   };
 
   // 3. Geofence 반경 설정 (100미터)
