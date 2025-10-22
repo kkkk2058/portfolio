@@ -1,4 +1,4 @@
-<!DOCTYPE html>
+<!-- <!DOCTYPE html>
 <html lang="en">
 <head>
     <meta charset="UTF-8">
@@ -246,4 +246,42 @@
 		</p>
 	</section>
 </body>
-</htmal>
+</htmal> -->
+
+
+
+<!DOCTYPE html>
+<html>
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>간단한 마커 기반 AR</title>
+    <!-- A-Frame 라이브러리 (3D/VR/AR) -->
+    <script src="https://aframe.io/releases/1.5.0/aframe.min.js"></script>
+    <!-- AR.js 라이브러리 (A-Frame용) -->
+    <script src="https://raw.githack.com/AR-js-org/AR.js/master/aframe/build/aframe-ar.min.js"></script>
+  </head>
+  <!-- body에서 margin을 제거하여 전체 화면으로 만듭니다. -->
+  <body style="margin: 0px; overflow: hidden">
+    <!-- 
+      embedded: 웹페이지 안에 AR 뷰를 삽입
+      arjs: AR.js를 활성화
+    -->
+    <a-scene embedded arjs>
+      <!-- 
+        마커가 감지되었을 때 보여줄 3D 객체 (빨간색 상자)
+        position="0 0.5 0"는 마커 중앙에서 0.5만큼 위에 띄우라는 의미입니다.
+      -->
+      <a-box position="0 0.5 0" material="color: tomato;"></a-box>
+
+      <!-- 
+        AR.js가 인식할 마커를 정의합니다. 
+        preset='hiro'는 AR.js에 내장된 'Hiro' 마커를 사용하겠다는 의미입니다.
+        이 태그가 카메라를 제어합니다.
+      -->
+      <a-marker-camera preset="hiro"></a-marker-camera>
+    </a-scene>
+  </body>
+</html>
+
+
