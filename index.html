@@ -1,78 +1,81 @@
 <!DOCTYPE html>
 <html lang="ko">
-  <head>
-    <meta charset="UTF-8" />
-    <meta
-      name="viewport"
-      content="width=device-width, initial-scale=1.0, user-scalable=no"
-    />
-    <title>웹 Geofence 프로토타입</title>
-    <script src="./main.js"></script>
+<head>
+  <meta charset="UTF-8">
+  <title>LifeGo AR Basic Viewer</title>
+  <script src="https://aframe.io/releases/1.6.0/aframe.min.js"></script>
+  
+  <script>
+    // AR Hit-Test 및 상호작용 컴포넌트
+    AFRAME.registerComponent('ar-hit-test-spawner', {
+      init: function () {
+        this.reticle = document.querySelector("#reticle");
+        this.hitTestLocation = null;
+        
+        // 화면 터치 시 모델 생성 이벤트 리스너
+        this.el.sceneEl.addEventListener('ar-hit-test-select', (e) => {
+            this.spawnModel();
+        });
+      },
 
-    <style>
-      body {
-        font-family: -apple-system, BlinkMacSystemFont, "Apple SD Gothic Neo",
-          "Pretendard", Roboto, "Noto Sans KR", "Segoe UI", "Malgun Gothic",
-          "Apple Color Emoji", "Segoe UI Emoji", "Segoe UI Symbol", sans-serif;
-        display: flex;
-        flex-direction: column;
-        align-items: center;
-        justify-content: center;
-        height: 100vh;
-        margin: 0;
-        background-color: #f0f2f5;
-        color: #333;
-      }
-      #status-card {
-        background: #ffffff;
-        padding: 20px;
-        border-radius: 12px;
-        box-shadow: 0 4px 12px rgba(0, 0, 0, 0.05);
-        text-align: center;
-        margin-bottom: 20px;
-      }
-      #status-title {
-        font-weight: 600;
-        font-size: 1.2rem;
-        color: #0075ff; /* 토스 블루 */
-      }
-      #status-message {
-        font-size: 0.9rem;
-        color: #555;
-        margin-top: 8px;
-        min-height: 40px;
-      }
-      #coupon-container {
-        /* 쿠폰은 기본적으로 숨겨져 있습니다. */
-        display: none;
-        background: linear-gradient(135deg, #0075ff, #005fcc);
-        border-radius: 16px;
-        padding: 30px;
-        text-align: center;
-        color: white;
-        box-shadow: 0 8px 20px rgba(0, 117, 255, 0.3);
-      }
-      #coupon-title {
-        font-size: 1.5rem;
-        font-weight: bold;
-        margin-bottom: 10px;
-      }
-      #coupon-desc {
-        font-size: 1rem;
-      }
-    </style>
-  </head>
-  <body>
-    <div id="status-card">
-      <div id="status-title">위치 확인 중...</div>
-      <div id="status-message">
-        집 근처인지 확인하기 위해 GPS 신호를 찾고 있습니다...
-      </div>
-    </div>
+      tick: function () {
+        // WebXR 세션에서 Hit-Test 결과(바닥 좌표)를 가져옴
+        const scene = this.el.sceneEl;
+        const xrSession = scene.renderer.xr.getSession();
 
-    <div id="coupon-container">
-      <div id="coupon-title">🎉 쿠폰 도착!</div>
-      <div id="coupon-desc">집 근처 도착을 환영합니다!</div>
-    </div>
-  </body>
+        if (!xrSession) return;
+
+        // A-Frame의 내장 ar-hit-test 컴포넌트가 바닥을 감지하면 reticle을 표시
+        const reticleAttr = this.reticle.getAttribute('visible');
+        
+        // reticle의 위치를 추적하여 저장해둠
+        if(reticleAttr) {
+            this.hitTestLocation = this.reticle.object3D.position;
+        } else {
+            this.hitTestLocation = null;
+        }
+      },
+
+      spawnModel: function () {
+        if (!this.hitTestLocation) return;
+
+        // 새로운 엔티티 생성 (여기에 GLB 모델을 넣으면 됩니다)
+        const newEl = document.createElement('a-entity');
+        
+        // 위치 설정
+        newEl.setAttribute('position', this.hitTestLocation);
+        
+        // 예시: 3D 모델 대신 간단한 박스 생성 (나중에 gltf-model="#my-model"로 변경)
+        newEl.setAttribute('geometry', 'primitive: box; width: 0.1; height: 0.1; depth: 0.1');
+        newEl.setAttribute('material', 'color: #0077ff; opacity: 0.8');
+        
+        // 애니메이션 추가 (등장 효과)
+        newEl.setAttribute('animation', 'property: scale; from: 0 0 0; to: 1 1 1; dur: 500; easing: easeOutElastic');
+
+        this.el.sceneEl.appendChild(newEl);
+      }
+    });
+  </script>
+</head>
+<body>
+  <a-scene webxr="optionalFeatures: hit-test; overlayElement: #overlay" 
+           ar-hit-test="target: #reticle; type: map">
+
+    <a-assets>
+      </a-assets>
+
+    <a-light type="directional" intensity="1" position="-1 2 1"></a-light>
+    <a-light type="ambient" intensity="0.5"></a-light>
+
+    <a-entity id="reticle" 
+              geometry="primitive: ring; radiusInner: 0.05; radiusOuter: 0.06" 
+              material="color: white; shader: flat" 
+              rotation="-90 0 0" 
+              visible="false">
+    </a-entity>
+
+    <a-entity ar-hit-test-spawner></a-entity>
+
+  </a-scene>
+</body>
 </html>
