@@ -2,74 +2,79 @@
 <html lang="ko">
 <head>
   <meta charset="UTF-8">
-  <title>LifeGo AR Teleport</title>
-  <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+  <title>LifeGo AR Basic Viewer</title>
   <script src="https://aframe.io/releases/1.6.0/aframe.min.js"></script>
   
   <script>
-    // 터치할 때마다 현실 <-> 가상 세계를 전환하는 로직
-    AFRAME.registerComponent('dimension-switcher', {
+    // AR Hit-Test 및 상호작용 컴포넌트
+    AFRAME.registerComponent('ar-hit-test-spawner', {
       init: function () {
-        this.isVirtual = false;
-        this.dome = document.querySelector("#world-dome");
-        this.text = document.querySelector("#guide-text");
+        this.reticle = document.querySelector("#reticle");
+        this.hitTestLocation = null;
         
-        // 화면 전체 터치 이벤트
-        this.el.sceneEl.addEventListener('click', () => {
-            this.toggleDimension();
+        // 화면 터치 시 모델 생성 이벤트 리스너
+        this.el.sceneEl.addEventListener('ar-hit-test-select', (e) => {
+            this.spawnModel();
         });
       },
 
-      toggleDimension: function () {
-        this.isVirtual = !this.isVirtual;
+      tick: function () {
+        // WebXR 세션에서 Hit-Test 결과(바닥 좌표)를 가져옴
+        const scene = this.el.sceneEl;
+        const xrSession = scene.renderer.xr.getSession();
+
+        if (!xrSession) return;
+
+        // A-Frame의 내장 ar-hit-test 컴포넌트가 바닥을 감지하면 reticle을 표시
+        const reticleAttr = this.reticle.getAttribute('visible');
         
-        if (this.isVirtual) {
-            // 가상 모드: 돔을 불투명하게 만들고 서서히 등장시킴
-            this.dome.setAttribute('visible', 'true');
-            this.dome.setAttribute('animation', 'property: material.opacity; from: 0; to: 1; dur: 1000; easing: easeOutQuad');
-            this.text.setAttribute('value', 'Return to Reality');
+        // reticle의 위치를 추적하여 저장해둠
+        if(reticleAttr) {
+            this.hitTestLocation = this.reticle.object3D.position;
         } else {
-            // 현실 모드: 돔을 투명하게 만들고 숨김
-            this.dome.setAttribute('animation', 'property: material.opacity; from: 1; to: 0; dur: 800; easing: easeInQuad');
-            // 애니메이션 끝나면 visible false 처리는 생략 (자연스러운 전환 위해)
-            this.text.setAttribute('value', 'Tab to Enter Van Gogh World');
+            this.hitTestLocation = null;
         }
+      },
+
+      spawnModel: function () {
+        if (!this.hitTestLocation) return;
+
+        // 새로운 엔티티 생성 (여기에 GLB 모델을 넣으면 됩니다)
+        const newEl = document.createElement('a-entity');
+        
+        // 위치 설정
+        newEl.setAttribute('position', this.hitTestLocation);
+        
+        // 예시: 3D 모델 대신 간단한 박스 생성 (나중에 gltf-model="#my-model"로 변경)
+        newEl.setAttribute('geometry', 'primitive: box; width: 0.1; height: 0.1; depth: 0.1');
+        newEl.setAttribute('material', 'color: #0077ff; opacity: 0.8');
+        
+        // 애니메이션 추가 (등장 효과)
+        newEl.setAttribute('animation', 'property: scale; from: 0 0 0; to: 1 1 1; dur: 500; easing: easeOutElastic');
+
+        this.el.sceneEl.appendChild(newEl);
       }
     });
   </script>
 </head>
-
 <body>
-  <a-scene 
-    webxr="requiredFeatures: hit-test; optionalFeatures: dom-overlay; overlayElement: #overlay"
-    renderer="alpha: true; antialias: true; colorManagement: true;">
+  <a-scene webxr="optionalFeatures: hit-test; overlayElement: #overlay" 
+           ar-hit-test="target: #reticle; type: map">
 
     <a-assets>
-      <img id="gogh-img" src="https://cdn.aframe.io/360-image-gallery-boilerplate/img/sechelt.jpg" crossorigin="anonymous">
       </a-assets>
 
-    <a-sky id="world-dome" 
-           src="#gogh-img" 
-           radius="50" 
-           opacity="0"
-           visible="true">
-    </a-sky>
+    <a-light type="directional" intensity="1" position="-1 2 1"></a-light>
+    <a-light type="ambient" intensity="0.5"></a-light>
 
-    <a-text id="guide-text"
-            value="Tap to Enter World" 
-            position="0 0 -2" 
-            align="center" 
-            color="white" 
-            scale="0.5 0.5 0.5"
-            shader="msdf"
-            font="https://raw.githubusercontent.com/etiennepinchon/aframe-fonts/master/fonts/roboto/Roboto-Bold.json">
-    </a-text>
+    <a-entity id="reticle" 
+              geometry="primitive: ring; radiusInner: 0.05; radiusOuter: 0.06" 
+              material="color: white; shader: flat" 
+              rotation="-90 0 0" 
+              visible="false">
+    </a-entity>
 
-    <a-light type="ambient" intensity="1"></a-light>
-
-    <a-entity dimension-switcher></a-entity>
-    
-    <div id="overlay"></div>
+    <a-entity ar-hit-test-spawner></a-entity>
 
   </a-scene>
 </body>
