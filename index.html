@@ -2,79 +2,119 @@
 <html lang="ko">
 <head>
   <meta charset="UTF-8">
-  <title>LifeGo AR Basic Viewer</title>
+  <title>LifeGo AR Dancing Astronaut</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+  
   <script src="https://aframe.io/releases/1.6.0/aframe.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/gh/c-frame/aframe-extras@7.2.0/dist/aframe-extras.min.js"></script>
   
   <script>
-    // AR Hit-Test 및 상호작용 컴포넌트
-    AFRAME.registerComponent('ar-hit-test-spawner', {
+    // 터치한 바닥 위치에 모델을 생성하는 컴포넌트
+    AFRAME.registerComponent('ar-spawner', {
       init: function () {
         this.reticle = document.querySelector("#reticle");
-        this.hitTestLocation = null;
         
-        // 화면 터치 시 모델 생성 이벤트 리스너
-        this.el.sceneEl.addEventListener('ar-hit-test-select', (e) => {
-            this.spawnModel();
+        // 화면 터치 이벤트 리스너
+        this.el.sceneEl.addEventListener('click', (e) => {
+            // 1. 레티클(커서)이 현재 바닥을 보고 있는지 확인
+            if (this.reticle && this.reticle.getAttribute('visible')) {
+                // 2. 레티클의 위치를 가져옴
+                const spawnPosition = this.reticle.object3D.position;
+                // 3. 모델 소환 함수 실행
+                this.spawnModel(spawnPosition);
+            }
         });
       },
 
-      tick: function () {
-        // WebXR 세션에서 Hit-Test 결과(바닥 좌표)를 가져옴
-        const scene = this.el.sceneEl;
-        const xrSession = scene.renderer.xr.getSession();
-
-        if (!xrSession) return;
-
-        // A-Frame의 내장 ar-hit-test 컴포넌트가 바닥을 감지하면 reticle을 표시
-        const reticleAttr = this.reticle.getAttribute('visible');
-        
-        // reticle의 위치를 추적하여 저장해둠
-        if(reticleAttr) {
-            this.hitTestLocation = this.reticle.object3D.position;
-        } else {
-            this.hitTestLocation = null;
-        }
-      },
-
-      spawnModel: function () {
-        if (!this.hitTestLocation) return;
-
-        // 새로운 엔티티 생성 (여기에 GLB 모델을 넣으면 됩니다)
+      spawnModel: function (position) {
+        // 새로운 엔티티(객체) 생성
         const newEl = document.createElement('a-entity');
         
-        // 위치 설정
-        newEl.setAttribute('position', this.hitTestLocation);
+        // 위치 설정 (바닥 좌표)
+        newEl.setAttribute('position', position);
         
-        // 예시: 3D 모델 대신 간단한 박스 생성 (나중에 gltf-model="#my-model"로 변경)
-        newEl.setAttribute('geometry', 'primitive: box; width: 0.1; height: 0.1; depth: 0.1');
-        newEl.setAttribute('material', 'color: #0077ff; opacity: 0.8');
+        // 크기 설정 (너무 크면 줄여야 함, 이 모델은 적당함)
+        newEl.setAttribute('scale', '0.5 0.5 0.5');
         
-        // 애니메이션 추가 (등장 효과)
-        newEl.setAttribute('animation', 'property: scale; from: 0 0 0; to: 1 1 1; dur: 500; easing: easeOutElastic');
+        // 1. 3D 모델 리소스 연결 (우주인 GLB)
+        newEl.setAttribute('gltf-model', '#astronaut-glb');
+        
+        // 2. 그림자 설정 (현실감 UP)
+        newEl.setAttribute('shadow', {receive: false, cast: true});
+        
+        // 3. 애니메이션 재생 설정 (aframe-extras 기능)
+        // clip: '*'는 모델에 있는 모든 애니메이션을 순서대로 재생하라는 뜻
+        // loop: 'repeat'는 무한 반복
+        newEl.setAttribute('animation-mixer', {clip: '*', loop: 'repeat'});
+        
+        // 4. 등장 효과 (작았다가 뿅 하고 커짐)
+        // *중요* 초기 scale을 0 0 0으로 설정해야 효과가 보임
+        newEl.setAttribute('scale', '0 0 0'); 
+        newEl.setAttribute('animation', {
+            property: 'scale',
+            to: '0.5 0.5 0.5', // 최종 크기
+            dur: 800, // 0.8초 동안
+            easing: 'easeOutElastic' // 띠용~ 하는 느낌
+        });
 
+        // 씬(Scene)에 최종 추가
         this.el.sceneEl.appendChild(newEl);
       }
     });
   </script>
+  
+  <style>
+    /* AR 실행 중 표시될 안내 문구 */
+    #overlay {
+      position: absolute;
+      bottom: 30px;
+      left: 0;
+      width: 100%;
+      text-align: center;
+      color: white;
+      font-family: sans-serif;
+      font-weight: bold;
+      text-shadow: 1px 1px 2px rgba(0,0,0,0.5);
+      pointer-events: none; /* 터치 무시 */
+      z-index: 10;
+    }
+  </style>
 </head>
+
 <body>
-  <a-scene webxr="optionalFeatures: hit-test; overlayElement: #overlay" 
-           ar-hit-test="target: #reticle; type: map">
+  <div id="overlay">바닥을 비추고 하얀 고리가 나오면 터치하세요!</div>
+
+  <a-scene 
+    webxr="requiredFeatures: hit-test; optionalFeatures: dom-overlay; overlayElement: #overlay"
+    renderer="alpha: true; colorManagement: true; physicallyCorrectLights: true;"
+    ar-hit-test="target: #reticle; type: map"
+    shadow="type: pcfsoft">
 
     <a-assets>
-      </a-assets>
+      <a-asset-item id="astronaut-glb" src="https://modelviewer.dev/shared-assets/models/Astronaut.glb"></a-asset-item>
+    </a-assets>
 
-    <a-light type="directional" intensity="1" position="-1 2 1"></a-light>
+    <a-entity light="type: directional; 
+                     intensity: 2; 
+                     castShadow: true; 
+                     shadowMapHeight: 2048; shadowMapWidth: 2048; 
+                     shadowCameraTop: 10; shadowCameraBottom: -10; shadowCameraRight: 10; shadowCameraLeft: -10;" 
+              position="5 10 7.5" target="#reticle">
+    </a-entity>
+    
     <a-light type="ambient" intensity="0.5"></a-light>
 
     <a-entity id="reticle" 
-              geometry="primitive: ring; radiusInner: 0.05; radiusOuter: 0.06" 
-              material="color: white; shader: flat" 
+              geometry="primitive: ring; radiusInner: 0.08; radiusOuter: 0.1" 
+              material="color: white; shader: flat; opacity: 0.8;" 
               rotation="-90 0 0" 
               visible="false">
+              <a-entity geometry="primitive: circle; radius: 0.02" material="color: white; shader: flat" position="0 0 0"></a-entity>
     </a-entity>
 
-    <a-entity ar-hit-test-spawner></a-entity>
+    <a-plane rotation="-90 0 0" position="0 -0.01 0" width="100" height="100" shadow="receive: true" material="opacity: 0.3; color: #888; transparent: true; roughness: 1; metalness: 0;"></a-plane>
+
+    <a-entity ar-spawner></a-entity>
 
   </a-scene>
 </body>
