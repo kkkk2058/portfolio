@@ -2,88 +2,46 @@
 <html lang="ko">
 <head>
   <meta charset="UTF-8">
-  <title>LifeGo AR Basic Viewer (Fixed)</title>
-  <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
-  <script src="https://aframe.io/releases/1.6.0/aframe.min.js"></script>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>LifeGo AR Viewer</title>
   
-  <script>
-    AFRAME.registerComponent('ar-hit-test-spawner', {
-      init: function () {
-        this.reticle = document.querySelector("#reticle");
-        this.hitTestLocation = null;
-        
-        // 화면 터치 시 모델 생성
-        this.el.sceneEl.addEventListener('ar-hit-test-select', (e) => {
-            this.spawnModel();
-        });
-      },
-
-      tick: function () {
-        const reticle = this.reticle;
-        // reticle이 보인다는 것은 바닥을 인식했다는 뜻
-        if (reticle && reticle.getAttribute('visible')) {
-            this.hitTestLocation = reticle.object3D.position;
-        } else {
-            this.hitTestLocation = null;
-        }
-      },
-
-      spawnModel: function () {
-        if (!this.hitTestLocation) return;
-
-        const newEl = document.createElement('a-entity');
-        newEl.setAttribute('position', this.hitTestLocation);
-        
-        // 박스 생성 (파란색 큐브)
-        newEl.setAttribute('geometry', 'primitive: box; width: 0.1; height: 0.1; depth: 0.1');
-        newEl.setAttribute('material', 'color: #0077ff; opacity: 0.9; metalness: 0.5; roughness: 0.1');
-        
-        // 등장 애니메이션
-        newEl.setAttribute('animation', 'property: scale; from: 0 0 0; to: 1 1 1; dur: 500; easing: easeOutElastic');
-
-        this.el.sceneEl.appendChild(newEl);
-      }
-    });
-  </script>
+  <script type="module" src="https://ajax.googleapis.com/ajax/libs/model-viewer/3.3.0/model-viewer.min.js"></script>
   
   <style>
-    /* AR 실행 중 화면에 표시될 UI (필요시 사용) */
-    #overlay {
+    body { margin: 0; padding: 0; width: 100vw; height: 100vh; }
+    model-viewer { width: 100%; height: 100%; background-color: #f0f0f0; }
+    
+    /* AR 버튼 커스텀 스타일 */
+    .ar-button {
+      background-color: white;
+      border-radius: 4px;
+      border: none;
       position: absolute;
-      z-index: 1000;
-      top: 20px;
-      left: 20px;
-      color: white;
-      font-family: sans-serif;
-      pointer-events: none; /* 터치 이벤트가 3D 씬으로 통과되도록 설정 */
+      bottom: 16px;
+      right: 16px;
+      padding: 12px 24px;
+      font-weight: bold;
+      box-shadow: 0 2px 4px rgba(0,0,0,0.25);
     }
   </style>
 </head>
-
 <body>
-  <a-scene 
-    webxr="requiredFeatures: hit-test; optionalFeatures: dom-overlay; overlayElement: #overlay"
-    renderer="alpha: true; colorManagement: true;"
-    ar-hit-test="target: #reticle; type: map; src: #">
 
-    <a-assets></a-assets>
+  <model-viewer 
+      src="https://modelviewer.dev/shared-assets/models/Astronaut.glb"
+      ios-src="https://modelviewer.dev/shared-assets/models/Astronaut.usdz"
+      alt="A 3D model of an astronaut"
+      ar
+      ar-modes="webxr scene-viewer quick-look" 
+      camera-controls
+      auto-rotate
+      shadow-intensity="1">
+      
+      <button slot="ar-button" class="ar-button">
+          👋 AR로 보기 (클릭)
+      </button>
 
-    <a-light type="directional" intensity="1" position="-1 2 1"></a-light>
-    <a-light type="ambient" intensity="0.5"></a-light>
+  </model-viewer>
 
-    <a-entity id="reticle" 
-              geometry="primitive: ring; radiusInner: 0.05; radiusOuter: 0.06" 
-              material="color: white; shader: flat" 
-              rotation="-90 0 0" 
-              visible="false">
-    </a-entity>
-
-    <a-entity ar-hit-test-spawner></a-entity>
-    
-    <div id="overlay">
-      <p>바닥을 비추고 터치하세요</p>
-    </div>
-
-  </a-scene>
 </body>
 </html>
