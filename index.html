@@ -2,30 +2,36 @@
 <html lang="ko">
 <head>
     <meta charset="UTF-8">
-    <title>Hybrid Input AR</title>
+    <title>Fixed AR Summoning</title>
     <script src="https://aframe.io/releases/1.6.0/aframe.min.js"></script>
     <style>
         #ui-layer {
             position: absolute; bottom: 30px; width: 100%; text-align: center; z-index: 10; pointer-events: none;
         }
         .btn-text {
-            background: rgba(0, 0, 0, 0.6); color: #00ff00; padding: 15px 30px; border-radius: 30px;
-            font-family: sans-serif; font-weight: bold; font-size: 18px; border: 2px solid #00ff00;
+            background: rgba(0, 0, 0, 0.6); color: #ffff00; padding: 10px 20px; border-radius: 20px;
+            font-family: sans-serif; font-weight: bold; border: 2px solid #ffff00;
         }
     </style>
 </head>
 <body>
-    <div id="ui-layer"><span class="btn-text">👇 화면을 꾹 눌러보세요!</span></div>
+    <div id="ui-layer"><span class="btn-text">AR 버튼을 누르고 -> 화면을 터치하세요!</span></div>
 
     <a-scene 
-        cursor="rayOrigin: mouse" 
-        raycaster="objects: none"
+        renderer="antialias: true; alpha: true"
         xr-mode-ui="enabled: true; enterAREnabled: true; XRMode: ar">
 
-        <a-camera position="0 1.6 0"></a-camera>
+        <a-camera position="0 1.6 0">
+            <a-entity 
+                id="cursor-ring"
+                position="0 0 -1" 
+                geometry="primitive: ring; radiusInner: 0.02; radiusOuter: 0.03"
+                material="color: #00ff00; shader: flat; opacity: 0.8; transparent: true">
+            </a-entity>
+        </a-camera>
 
-        <a-light type="directional" position="1 4 2" intensity="0.8"></a-light>
-        <a-light type="ambient" intensity="0.4"></a-light>
+        <a-light type="directional" position="1 4 2" intensity="1"></a-light>
+        <a-light type="ambient" intensity="0.5"></a-light>
 
     </a-scene>
 
@@ -41,69 +47,66 @@
         const scene = document.querySelector('a-scene');
         const uiText = document.querySelector('.btn-text');
 
-        // 💥 소환 로직 (함수로 분리)
-        function spawnMagic(e) {
-            // 중복 실행 방지 (터치와 클릭이 동시에 뜰 경우 대비)
-            // 최근 실행 시간이 0.2초 이내면 무시
-            const now = Date.now();
-            if (spawnMagic.lastTime && (now - spawnMagic.lastTime < 200)) return;
-            spawnMagic.lastTime = now;
+        // 소환 함수
+        function spawnMagic() {
+            // 1. 현재 카메라(내 눈)의 위치와 회전값 가져오기
+            const cameraEl = document.querySelector('a-camera');
+            const worldPos = new THREE.Vector3();
+            const worldDir = new THREE.Vector3();
 
-            // --- 위치 계산 ---
-            const camera = document.querySelector('a-camera');
-            const pos = camera.getAttribute('position');
-            const rot = camera.getAttribute('rotation');
-            const angle = rot.y * (Math.PI / 180);
+            // 카메라의 정확한 월드 좌표 추출
+            cameraEl.object3D.getWorldPosition(worldPos);
+            cameraEl.object3D.getWorldDirection(worldDir);
             
-            // 눈앞 0.8미터
+            // worldDir은 카메라가 보는 방향(보통 -z)을 가리킴. 
+            // 내 눈앞 0.8미터 위치 계산: 현재위치 + (바라보는방향 * 거리)
+            // 주의: Three.js에서 방향 벡터는 정규화되어 있음
+            const spawnDistance = 0.8;
             const spawnPos = {
-                x: pos.x - Math.sin(angle) * 0.8,
-                y: pos.y, 
-                z: pos.z - Math.cos(angle) * 0.8
+                x: worldPos.x + (worldDir.x * spawnDistance),
+                y: worldPos.y + (worldDir.y * spawnDistance), // AR에서는 높이 보정 안 함 (보는 높이 그대로)
+                z: worldPos.z + (worldDir.z * spawnDistance)
             };
 
-            // --- 정령 생성 ---
+            // --- 정령 생성 (이전과 동일) ---
             const wisp = document.createElement('a-entity');
+            
+            // 위치 적용
             wisp.setAttribute('position', spawnPos);
-            wisp.setAttribute('look-at-camera', '');
+            wisp.setAttribute('look-at-camera', ''); // 나를 쳐다봄
 
-            // 랜덤 색상
             const color = '#' + Math.floor(Math.random()*16777215).toString(16);
 
-            // 핵 (Sphere)
+            // 핵
             const core = document.createElement('a-sphere');
-            core.setAttribute('radius', '0.1');
-            core.setAttribute('material', `color: ${color}; opacity: 0.8; transparent: true`);
-            core.setAttribute('animation', 'property: scale; from: 0.8 0.8 0.8; to: 1.2 1.2 1.2; dir: alternate; loop: true; dur: 400');
+            core.setAttribute('radius', '0.08');
+            core.setAttribute('material', `color: ${color}; shader: flat; opacity: 0.9; transparent: true`);
+            core.setAttribute('animation', 'property: scale; from: 0.9 0.9 0.9; to: 1.1 1.1 1.1; dir: alternate; loop: true; dur: 500');
             wisp.appendChild(core);
 
-            // 고리 (Ring)
+            // 고리
             const ring = document.createElement('a-torus');
             ring.setAttribute('radius', '0.2');
-            ring.setAttribute('radius-tubular', '0.01');
-            ring.setAttribute('material', `color: white; opacity: 0.5; transparent: true`);
-            ring.setAttribute('animation', 'property: rotation; to: 360 360 0; loop: true; dur: 2000; easing: linear');
+            ring.setAttribute('radius-tubular', '0.005');
+            ring.setAttribute('material', `color: white; opacity: 0.6; transparent: true`);
+            ring.setAttribute('animation', 'property: rotation; to: 0 360 0; loop: true; dur: 2000; easing: linear');
             wisp.appendChild(ring);
 
-            // 등장 애니메이션
+            // 등장 효과
             wisp.setAttribute('scale', '0 0 0');
-            wisp.setAttribute('animation__pop', 'property: scale; to: 1 1 1; dur: 500; easing: easeOutBack');
+            wisp.setAttribute('animation__pop', 'property: scale; to: 1 1 1; dur: 400; easing: easeOutBack');
 
             scene.appendChild(wisp);
             
-            uiText.innerText = "✨ 소환 성공!";
+            uiText.innerText = "✨ 소환됨! (" + color + ")";
             uiText.style.color = color;
             uiText.style.borderColor = color;
         }
 
-        // ✅ 핵심 수정 사항: 이벤트 리스너 이중 등록
-        
-        // 1. PC용 클릭
-        window.addEventListener('click', spawnMagic);
-
-        // 2. 모바일용 터치 (touchstart)
-        // 'touchstart'는 손가락이 닿자마자 발생하므로 반응이 가장 빠릅니다.
+        // 터치 이벤트 연결
+        // 모바일 터치 + PC 클릭 모두 대응
         window.addEventListener('touchstart', spawnMagic);
+        window.addEventListener('click', spawnMagic);
 
     </script>
 </body>
