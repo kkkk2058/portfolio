@@ -2,21 +2,20 @@
 <html lang="ko">
 <head>
     <meta charset="UTF-8">
-    <title>Native AR Magic</title>
+    <title>Hybrid Input AR</title>
     <script src="https://aframe.io/releases/1.6.0/aframe.min.js"></script>
-
     <style>
         #ui-layer {
             position: absolute; bottom: 30px; width: 100%; text-align: center; z-index: 10; pointer-events: none;
         }
         .btn-text {
-            background: rgba(20, 0, 50, 0.8); color: #00ffff; padding: 12px 24px; border-radius: 30px;
-            font-family: sans-serif; font-weight: bold; border: 1px solid #00ffff;
+            background: rgba(0, 0, 0, 0.6); color: #00ff00; padding: 15px 30px; border-radius: 30px;
+            font-family: sans-serif; font-weight: bold; font-size: 18px; border: 2px solid #00ff00;
         }
     </style>
 </head>
 <body>
-    <div id="ui-layer"><span class="btn-text">👆 화면을 터치해 정령을 소환하세요!</span></div>
+    <div id="ui-layer"><span class="btn-text">👇 화면을 꾹 눌러보세요!</span></div>
 
     <a-scene 
         cursor="rayOrigin: mouse" 
@@ -25,13 +24,13 @@
 
         <a-camera position="0 1.6 0"></a-camera>
 
-        <a-light type="directional" position="1 4 2" intensity="0.6" color="#ccffcc"></a-light>
-        <a-light type="ambient" intensity="0.4" color="#220033"></a-light>
+        <a-light type="directional" position="1 4 2" intensity="0.8"></a-light>
+        <a-light type="ambient" intensity="0.4"></a-light>
 
     </a-scene>
 
     <script>
-        // ✅ 1. '나를 쳐다보는' 기능 (Look-At)
+        // 나를 쳐다보는 컴포넌트
         AFRAME.registerComponent('look-at-camera', {
             tick: function () {
                 if (!this.el.sceneEl.camera) return;
@@ -40,114 +39,72 @@
         });
 
         const scene = document.querySelector('a-scene');
-        const colors = ['#00ffff', '#ff00ff', '#ffff00', '#55ff00'];
+        const uiText = document.querySelector('.btn-text');
 
-        // ✅ 2. 직접 만든 파티클 폭발 함수 (외부 라이브러리 대체)
-        function createExplosion(position, color) {
-            const particleCount = 30; // 폭발 파편 개수
+        // 💥 소환 로직 (함수로 분리)
+        function spawnMagic(e) {
+            // 중복 실행 방지 (터치와 클릭이 동시에 뜰 경우 대비)
+            // 최근 실행 시간이 0.2초 이내면 무시
+            const now = Date.now();
+            if (spawnMagic.lastTime && (now - spawnMagic.lastTime < 200)) return;
+            spawnMagic.lastTime = now;
 
-            for (let i = 0; i < particleCount; i++) {
-                const particle = document.createElement('a-entity');
-                
-                // 작은 사각형이나 구 모양
-                particle.setAttribute('geometry', 'primitive: box; width: 0.02; height: 0.02; depth: 0.02');
-                particle.setAttribute('material', `shader: flat; color: ${color}; transparent: true; opacity: 1`);
-                particle.setAttribute('position', position);
-
-                // 랜덤한 방향으로 퍼져나가는 벡터 계산
-                const xDir = (Math.random() - 0.5) * 2; // -1 ~ 1
-                const yDir = (Math.random() - 0.5) * 2;
-                const zDir = (Math.random() - 0.5) * 2;
-
-                // 애니메이션 1: 밖으로 퍼지기
-                particle.setAttribute('animation__move', {
-                    property: 'position',
-                    to: `${position.x + xDir} ${position.y + yDir} ${position.z + zDir}`,
-                    dur: 1000,
-                    easing: 'easeOutQuad'
-                });
-
-                // 애니메이션 2: 서서히 사라지기
-                particle.setAttribute('animation__fade', {
-                    property: 'material.opacity',
-                    to: 0,
-                    dur: 1000,
-                    easing: 'linear'
-                });
-
-                // 1초 뒤 자동 삭제 (메모리 관리)
-                setTimeout(() => {
-                    if (particle.parentNode) particle.parentNode.removeChild(particle);
-                }, 1000);
-
-                scene.appendChild(particle);
-            }
-        }
-
-        // ✅ 3. 터치 이벤트
-        scene.addEventListener('click', (e) => {
-            // 위치 계산
+            // --- 위치 계산 ---
             const camera = document.querySelector('a-camera');
             const pos = camera.getAttribute('position');
             const rot = camera.getAttribute('rotation');
             const angle = rot.y * (Math.PI / 180);
             
-            // 눈앞 0.8미터 (조금 더 멀리 띄움)
+            // 눈앞 0.8미터
             const spawnPos = {
                 x: pos.x - Math.sin(angle) * 0.8,
                 y: pos.y, 
                 z: pos.z - Math.cos(angle) * 0.8
             };
 
-            const randomColor = colors[Math.floor(Math.random() * colors.length)];
-
-            // 💥 1. 수제 파티클 폭발 실행
-            createExplosion(spawnPos, randomColor);
-
-            // 👻 2. 정령(Wisp) 본체 생성
+            // --- 정령 생성 ---
             const wisp = document.createElement('a-entity');
             wisp.setAttribute('position', spawnPos);
-            wisp.setAttribute('look-at-camera', ''); // 나를 쳐다봄
+            wisp.setAttribute('look-at-camera', '');
 
-            // (A) 빛나는 핵
+            // 랜덤 색상
+            const color = '#' + Math.floor(Math.random()*16777215).toString(16);
+
+            // 핵 (Sphere)
             const core = document.createElement('a-sphere');
-            core.setAttribute('radius', '0.06');
-            core.setAttribute('material', `color: ${randomColor}; shader: flat; transparent: true; opacity: 0.8`);
-            // 고동치는 애니메이션
-            core.setAttribute('animation', 'property: scale; from: 1 1 1; to: 1.5 1.5 1.5; dir: alternate; loop: true; dur: 500');
+            core.setAttribute('radius', '0.1');
+            core.setAttribute('material', `color: ${color}; opacity: 0.8; transparent: true`);
+            core.setAttribute('animation', 'property: scale; from: 0.8 0.8 0.8; to: 1.2 1.2 1.2; dir: alternate; loop: true; dur: 400');
             wisp.appendChild(core);
 
-            // (B) 회전하는 고리 1
-            const ring1 = document.createElement('a-torus');
-            ring1.setAttribute('radius', '0.12');
-            ring1.setAttribute('radius-tubular', '0.005');
-            ring1.setAttribute('material', `color: white; opacity: 0.5; transparent: true`);
-            ring1.setAttribute('animation', 'property: rotation; to: 360 360 0; loop: true; dur: 2000; easing: linear');
-            wisp.appendChild(ring1);
+            // 고리 (Ring)
+            const ring = document.createElement('a-torus');
+            ring.setAttribute('radius', '0.2');
+            ring.setAttribute('radius-tubular', '0.01');
+            ring.setAttribute('material', `color: white; opacity: 0.5; transparent: true`);
+            ring.setAttribute('animation', 'property: rotation; to: 360 360 0; loop: true; dur: 2000; easing: linear');
+            wisp.appendChild(ring);
 
-            // (C) 회전하는 고리 2 (반대 방향)
-            const ring2 = document.createElement('a-torus');
-            ring2.setAttribute('radius', '0.18');
-            ring2.setAttribute('radius-tubular', '0.002');
-            ring2.setAttribute('material', `color: ${randomColor}; opacity: 0.3; transparent: true`);
-            ring2.setAttribute('animation', 'property: rotation; to: -360 0 -360; loop: true; dur: 4000; easing: linear');
-            wisp.appendChild(ring2);
-
-            // (D) 둥둥 떠있는 움직임
-            wisp.setAttribute('animation__float', `property: position; to: ${spawnPos.x} ${spawnPos.y + 0.1} ${spawnPos.z}; dir: alternate; loop: true; dur: 1500; easing: easeInOutSine`);
-
-            // 생성 시 작게 시작해서 커짐 (Pop 효과)
+            // 등장 애니메이션
             wisp.setAttribute('scale', '0 0 0');
-            wisp.setAttribute('animation__pop', 'property: scale; to: 1 1 1; dur: 600; easing: easeOutElastic');
+            wisp.setAttribute('animation__pop', 'property: scale; to: 1 1 1; dur: 500; easing: easeOutBack');
 
             scene.appendChild(wisp);
+            
+            uiText.innerText = "✨ 소환 성공!";
+            uiText.style.color = color;
+            uiText.style.borderColor = color;
+        }
 
-            // 안내 문구 업데이트
-            const ui = document.querySelector('.btn-text');
-            ui.innerText = `✨ ${randomColor} 정령 소환됨!`;
-            ui.style.color = randomColor;
-            ui.style.borderColor = randomColor;
-        });
+        // ✅ 핵심 수정 사항: 이벤트 리스너 이중 등록
+        
+        // 1. PC용 클릭
+        window.addEventListener('click', spawnMagic);
+
+        // 2. 모바일용 터치 (touchstart)
+        // 'touchstart'는 손가락이 닿자마자 발생하므로 반응이 가장 빠릅니다.
+        window.addEventListener('touchstart', spawnMagic);
+
     </script>
 </body>
 </html>
