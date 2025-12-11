@@ -2,79 +2,129 @@
 <html lang="ko">
 <head>
     <meta charset="UTF-8">
-    <title>AR Force Spawn</title>
+    <title>AR Magic Summoning</title>
     <script src="https://aframe.io/releases/1.6.0/aframe.min.js"></script>
+    <script src="https://unpkg.com/aframe-particle-system-component@1.1.3/dist/aframe-particle-system-component.min.js"></script>
+
     <style>
-        #overlay {
-            position: absolute; bottom: 30px; left: 0; width: 100%;
-            text-align: center; z-index: 10; pointer-events: none;
+        /* UI 안내문구 스타일 */
+        #ui-layer {
+            position: absolute; bottom: 30px; width: 100%; text-align: center; z-index: 10; pointer-events: none;
         }
-        .message {
-            background: rgba(255, 0, 0, 0.6); color: white;
-            padding: 10px 20px; border-radius: 20px; font-size: 16px;
+        .btn-text {
+            background: rgba(50, 0, 100, 0.7); color: #00ffff; padding: 12px 24px; border-radius: 30px;
+            font-family: sans-serif; font-weight: bold; box-shadow: 0 0 15px #00ffff; text-shadow: 0 0 5px #00ffff;
         }
     </style>
 </head>
 <body>
-    <div id="overlay"><span class="message">화면을 터치하면 눈앞에 나타납니다!</span></div>
+    <div id="ui-layer"><span class="btn-text">✨ 화면을 터치하여 마법 정령을 소환하세요! ✨</span></div>
 
-    <a-scene xr-mode-ui="enabled: true; enterAREnabled: true; XRMode: ar">
-        
-        <a-camera position="0 1.6 0">
-            <a-cursor visible="false"></a-cursor>
-        </a-camera>
+    <a-scene 
+        cursor="rayOrigin: mouse" 
+        raycaster="objects: none"
+        xr-mode-ui="enabled: true; enterAREnabled: true; XRMode: ar"
+        renderer="antialias: true; colorManagement: true;">
 
-        <a-light type="directional" intensity="1" position="-1 1 0"></a-light>
-        <a-light type="ambient" intensity="0.5"></a-light>
+        <a-camera position="0 1.6 0"></a-camera>
+
+        <a-light type="directional" position="1 2 1" intensity="0.5" color="#cceeff"></a-light>
+        <a-light type="ambient" intensity="0.3" color="#330066"></a-light>
 
     </a-scene>
 
     <script>
+        // ✅ 1. '나를 쳐다보는' 커스텀 컴포넌트 등록
+        // 이 컴포넌트가 붙은 물체는 매 프레임마다 카메라 위치를 바라봅니다.
+        AFRAME.registerComponent('look-at-camera', {
+            tick: function () {
+                if (!this.el.sceneEl.camera) return; // 카메라가 아직 없으면 패스
+                const cameraPos = this.el.sceneEl.camera.el.object3D.position;
+                // object3D 레벨에서 lookAt 함수 사용
+                this.el.object3D.lookAt(cameraPos);
+            }
+        });
+
+
         const scene = document.querySelector('a-scene');
+        const uiText = document.querySelector('.btn-text');
+        const colors = ['#00ffff', '#ff00ff', '#ffff00', '#00ff00']; // 네온 컬러 팔레트
 
-        // 랜덤 색상
-        function getRandomColor() {
-            return '#' + Math.floor(Math.random()*16777215).toString(16);
-        }
-
-        // 터치 이벤트 (화면 아무데나 클릭)
-        scene.addEventListener('click', function () {
+        // ✅ 2. 터치 이벤트 리스너
+        scene.addEventListener('click', (e) => {
+            const randomColor = colors[Math.floor(Math.random() * colors.length)];
             
-            // 1. 카메라의 현재 위치와 회전값을 가져옴
+            // 2-1. 카메라 앞 0.5m 위치 계산 (이전과 동일)
             const camera = document.querySelector('a-camera');
             const position = camera.getAttribute('position');
             const rotation = camera.getAttribute('rotation');
-
-            // 2. 소환할 물체 생성
-            const box = document.createElement('a-box');
-            
-            // 3. 카메라 위치보다 Z축(앞)으로 0.5미터 떨어진 곳 계산이 복잡하므로
-            // 일단 카메라 위치에 생성하고, 카메라를 자식으로 두는 대신
-            // 간단히 "사용자 눈앞"에 띄우기 위해 카메라의 자식으로 붙였다가 떼거나,
-            // 여기서는 단순화를 위해 카메라 위치에서 약간 앞(-1)에 고정값으로 던져보겠습니다.
-            // (정확한 3D 벡터 계산 대신 가장 쉬운 방법 사용)
-            
-            // 카메라의 '현재 바라보는 방향' 벡터 구하기
             const angle = rotation.y * (Math.PI / 180);
-            const xOffset = -Math.sin(angle) * 0.5; // 50cm 앞
+            const xOffset = -Math.sin(angle) * 0.5;
             const zOffset = -Math.cos(angle) * 0.5;
+            const spawnPos = { x: position.x + xOffset, y: position.y, z: position.z + zOffset };
 
-            // 최종 위치 설정 (카메라 높이보다 조금 아래)
-            box.setAttribute('position', {
-                x: position.x + xOffset,
-                y: position.y, // 눈높이
-                z: position.z + zOffset
-            });
+            // --- 마법 정령(Wisp) 컨테이너 생성 ---
+            // 이 빈 엔티티가 전체 정령의 기준점이 되며, 나를 쳐다보는 역할을 합니다.
+            const wispContainer = document.createElement('a-entity');
+            wispContainer.setAttribute('position', spawnPos);
+            wispContainer.setAttribute('look-at-camera', ''); // 🔥 나를 쳐다보게 설정!
 
-            // 스타일 및 애니메이션
-            box.setAttribute('material', `color: ${getRandomColor()}; transparent: true; opacity: 0.8`);
-            box.setAttribute('scale', '0.1 0.1 0.1'); // 10cm 크기
-            box.setAttribute('animation', 'property: rotation; to: 0 360 360; loop: true; dur: 3000');
-            
-            // 씬에 추가
-            scene.appendChild(box);
+                // ▶ (A) 마법진 파티클 폭발 효과 (생성 순간)
+                const burstParticles = document.createElement('a-entity');
+                burstParticles.setAttribute('particle-system', `
+                    preset: explosion; 
+                    color: ${randomColor}, #ffffff; 
+                    particleCount: 100; 
+                    duration: 0.5; 
+                    size: 0.5
+                `);
+                // 폭발은 1초 뒤에 스스로 삭제되도록 설정
+                setTimeout(() => { wispContainer.removeChild(burstParticles); }, 1000);
+                wispContainer.appendChild(burstParticles);
 
-            document.querySelector('.message').innerText = "소환 완료! (" + getRandomColor() + ")";
+                // ▶ (B) 정령의 핵심 (Core Sphere) - 고동치는 애니메이션
+                const core = document.createElement('a-sphere');
+                core.setAttribute('radius', '0.08');
+                core.setAttribute('material', `color: ${randomColor}; emissive: ${randomColor}; emissiveIntensity: 2; transparent: true; opacity: 0.9`);
+                // 둥둥 떠다니는 느낌
+                core.setAttribute('animation__float', 'property: position; to: 0 0.05 0; dir: alternate; loop: true; dur: 1500; easing: easeInOutSine');
+                // 크기가 커졌다 작아졌다 고동치는 느낌
+                core.setAttribute('animation__pulse', 'property: scale; from: 0.9 0.9 0.9; to: 1.1 1.1 1.1; dir: alternate; loop: true; dur: 800; easing: easeInOutQuad');
+                wispContainer.appendChild(core);
+
+                // ▶ (C) 외곽 회전 고리 (Outer Ring) - 회전 애니메이션
+                const ring = document.createElement('a-torus');
+                ring.setAttribute('radius', '0.15');
+                ring.setAttribute('radius-tubular', '0.01');
+                ring.setAttribute('rotation', '45 0 0'); // 약간 기울임
+                ring.setAttribute('material', `color: #ffffff; emissive: ${randomColor}; emissiveIntensity: 1; wireframe: true; transparent: true; opacity: 0.5`);
+                // 뱅글뱅글 회전
+                ring.setAttribute('animation__spin', 'property: rotation; to: 45 360 0; loop: true; dur: 3000; easing: linear');
+                wispContainer.appendChild(ring);
+
+                // ▶ (D) 지속적인 오라 파티클 (Aura Particles)
+                const auraParticles = document.createElement('a-entity');
+                auraParticles.setAttribute('particle-system', `
+                    preset: dust; 
+                    color: ${randomColor}; 
+                    particleCount: 200; 
+                    size: 0.2; 
+                    maxAge: 2; 
+                    blending: additive;
+                    velocityValue: 0 0.1 0;
+                    positionSpread: 0.2 0.2 0.2;
+                `);
+                wispContainer.appendChild(auraParticles);
+
+            // 씬에 최종 추가
+            scene.appendChild(wispContainer);
+
+            // 사운드 효과 (선택 사항 - 필요하면 주석 해제 후 사운드 파일 연결)
+            // scene.components.sound.playSound();
+
+            uiText.innerHTML = `✨ ${randomColor} 속성 정령 소환 완료!`;
+            uiText.style.color = randomColor;
+            uiText.style.textShadow = `0 0 15px ${randomColor}`;
         });
     </script>
 </body>
