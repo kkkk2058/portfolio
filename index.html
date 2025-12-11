@@ -1,121 +1,119 @@
 <!DOCTYPE html>
 <html lang="ko">
 <head>
-  <meta charset="UTF-8">
-  <title>LifeGo AR Dancing Astronaut</title>
-  <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
-  
-  <script src="https://aframe.io/releases/1.6.0/aframe.min.js"></script>
-  <script src="https://cdn.jsdelivr.net/gh/c-frame/aframe-extras@7.2.0/dist/aframe-extras.min.js"></script>
-  
-  <script>
-    // 터치한 바닥 위치에 모델을 생성하는 컴포넌트
-    AFRAME.registerComponent('ar-spawner', {
-      init: function () {
-        this.reticle = document.querySelector("#reticle");
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>WebXR Debugger</title>
+    <script src="https://aframe.io/releases/1.6.0/aframe.min.js"></script>
+    
+    <style>
+        /* 화면 위에 로그를 띄우기 위한 스타일 */
+        #debug-console {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 50vh;
+            background: rgba(0, 0, 0, 0.7);
+            color: #00ff00; /* 잘 보이는 형광 초록색 */
+            font-family: monospace;
+            font-size: 14px;
+            padding: 10px;
+            z-index: 99999; /* 모든 것보다 위에 표시 */
+            overflow-y: scroll;
+            pointer-events: none; /* 터치 통과 */
+        }
+        .error { color: #ff5555; font-weight: bold; }
+        .warn { color: #ffff55; }
+        .success { color: #55ffff; font-weight: bold; }
+    </style>
+</head>
+<body>
+
+    <div id="debug-console">시스템 진단 시작...<br>--------------------<br></div>
+
+    <a-scene 
+        xr-mode-ui="enabled: true; enterAREnabled: true; XRMode: ar"
+        webxr="optionalFeatures: hit-test, dom-overlay; overlayElement: #debug-console"
+        renderer="logarithmicDepthBuffer: true;">
+
+        <a-box position="0 0 -1" scale="0.1 0.1 0.1" color="red" animation="property: rotation; to: 0 360 0; loop: true; dur: 2000"></a-box>
         
-        // 화면 터치 이벤트 리스너
-        this.el.sceneEl.addEventListener('click', (e) => {
-            // 1. 레티클(커서)이 현재 바닥을 보고 있는지 확인
-            if (this.reticle && this.reticle.getAttribute('visible')) {
-                // 2. 레티클의 위치를 가져옴
-                const spawnPosition = this.reticle.object3D.position;
-                // 3. 모델 소환 함수 실행
-                this.spawnModel(spawnPosition);
+        <a-camera position="0 1.6 0"></a-camera>
+    </a-scene>
+
+    <script>
+        // 1. 로그 출력 함수
+        const consoleDiv = document.getElementById('debug-console');
+        function log(msg, type = 'normal') {
+            const span = document.createElement('span');
+            span.innerHTML = `> ${msg}<br>`;
+            if (type === 'error') span.className = 'error';
+            if (type === 'warn') span.className = 'warn';
+            if (type === 'success') span.className = 'success';
+            consoleDiv.appendChild(span);
+            console.log(msg); // 브라우저 콘솔에도 동시 출력
+        }
+
+        // 2. 진단 로직 실행
+        window.addEventListener('load', async () => {
+            log("1. 프로토콜 검사 중...");
+            const isLocalhost = location.hostname === 'localhost' || location.hostname === '127.0.0.1';
+            const isHttps = location.protocol === 'https:';
+
+            if (isHttps) {
+                log("✅ HTTPS 연결 확인됨", 'success');
+            } else if (isLocalhost) {
+                log("⚠️ 로컬호스트 접속 (PC 테스트용)", 'warn');
+            } else {
+                log("❌ 치명적 오류: HTTPS가 아닙니다!", 'error');
+                log("WebXR은 http://192.168.x.x 에서 작동하지 않습니다.", 'error');
+                log("ngrok 등을 사용하여 https 주소로 접속하세요.", 'error');
+                return; // 여기서 중단
+            }
+
+            log("2. WebXR API 지원 여부 확인...");
+            if ('xr' in navigator) {
+                log("✅ navigator.xr 객체 존재함", 'success');
+                
+                try {
+                    log("3. AR 세션('immersive-ar') 지원 하드웨어 체크...");
+                    const isSupported = await navigator.xr.isSessionSupported('immersive-ar');
+                    if (isSupported) {
+                        log("✅ 이 기기는 AR을 지원합니다!", 'success');
+                        log("💡 화면 우측 하단의 'AR' 또는 'VR' 버튼을 찾아보세요.");
+                    } else {
+                        log("❌ 이 기기는 AR 세션을 지원하지 않습니다.", 'error');
+                        log("이유 1: Google Play AR 서비스 미설치", 'warn');
+                        log("이유 2: 아이폰(iOS) WebKit 제약", 'warn');
+                        log("이유 3: 지원되지 않는 구형 기기", 'warn');
+                    }
+                } catch (e) {
+                    log(`❌ AR 체크 중 에러 발생: ${e.message}`, 'error');
+                }
+            } else {
+                log("❌ WebXR API를 찾을 수 없습니다.", 'error');
+                if (navigator.userAgent.indexOf('Chrome') === -1) {
+                    log("팁: 모바일 Chrome 브라우저를 사용해보세요.", 'warn');
+                }
             }
         });
-      },
 
-      spawnModel: function (position) {
-        // 새로운 엔티티(객체) 생성
-        const newEl = document.createElement('a-entity');
-        
-        // 위치 설정 (바닥 좌표)
-        newEl.setAttribute('position', position);
-        
-        // 크기 설정 (너무 크면 줄여야 함, 이 모델은 적당함)
-        newEl.setAttribute('scale', '0.5 0.5 0.5');
-        
-        // 1. 3D 모델 리소스 연결 (우주인 GLB)
-        newEl.setAttribute('gltf-model', '#astronaut-glb');
-        
-        // 2. 그림자 설정 (현실감 UP)
-        newEl.setAttribute('shadow', {receive: false, cast: true});
-        
-        // 3. 애니메이션 재생 설정 (aframe-extras 기능)
-        // clip: '*'는 모델에 있는 모든 애니메이션을 순서대로 재생하라는 뜻
-        // loop: 'repeat'는 무한 반복
-        newEl.setAttribute('animation-mixer', {clip: '*', loop: 'repeat'});
-        
-        // 4. 등장 효과 (작았다가 뿅 하고 커짐)
-        // *중요* 초기 scale을 0 0 0으로 설정해야 효과가 보임
-        newEl.setAttribute('scale', '0 0 0'); 
-        newEl.setAttribute('animation', {
-            property: 'scale',
-            to: '0.5 0.5 0.5', // 최종 크기
-            dur: 800, // 0.8초 동안
-            easing: 'easeOutElastic' // 띠용~ 하는 느낌
+        // 3. A-Frame 내부 이벤트 리스너 (버튼 클릭 반응 확인)
+        const scene = document.querySelector('a-scene');
+        scene.addEventListener('enter-vr', () => {
+            log("🚀 AR/VR 모드 진입 성공!", 'success');
+        });
+        scene.addEventListener('exit-vr', () => {
+            log("반환: 일반 모드로 복귀");
+        });
+        scene.addEventListener('ar-hit-test-start', () => {
+            log("AR Hit-Test 시작됨 (카메라 인식 중)");
+        });
+        scene.addEventListener('enter-vr-error', (evt) => {
+             log(`❌ 진입 실패 에러: ${evt.detail}`, 'error');
         });
 
-        // 씬(Scene)에 최종 추가
-        this.el.sceneEl.appendChild(newEl);
-      }
-    });
-  </script>
-  
-  <style>
-    /* AR 실행 중 표시될 안내 문구 */
-    #overlay {
-      position: absolute;
-      bottom: 30px;
-      left: 0;
-      width: 100%;
-      text-align: center;
-      color: white;
-      font-family: sans-serif;
-      font-weight: bold;
-      text-shadow: 1px 1px 2px rgba(0,0,0,0.5);
-      pointer-events: none; /* 터치 무시 */
-      z-index: 10;
-    }
-  </style>
-</head>
-
-<body>
-  <div id="overlay">바닥을 비추고 하얀 고리가 나오면 터치하세요!</div>
-
-  <a-scene 
-    webxr="requiredFeatures: hit-test; optionalFeatures: dom-overlay; overlayElement: #overlay"
-    renderer="alpha: true; colorManagement: true; physicallyCorrectLights: true;"
-    ar-hit-test="target: #reticle; type: map"
-    shadow="type: pcfsoft">
-
-    <a-assets>
-      <a-asset-item id="astronaut-glb" src="https://modelviewer.dev/shared-assets/models/Astronaut.glb"></a-asset-item>
-    </a-assets>
-
-    <a-entity light="type: directional; 
-                     intensity: 2; 
-                     castShadow: true; 
-                     shadowMapHeight: 2048; shadowMapWidth: 2048; 
-                     shadowCameraTop: 10; shadowCameraBottom: -10; shadowCameraRight: 10; shadowCameraLeft: -10;" 
-              position="5 10 7.5" target="#reticle">
-    </a-entity>
-    
-    <a-light type="ambient" intensity="0.5"></a-light>
-
-    <a-entity id="reticle" 
-              geometry="primitive: ring; radiusInner: 0.08; radiusOuter: 0.1" 
-              material="color: white; shader: flat; opacity: 0.8;" 
-              rotation="-90 0 0" 
-              visible="false">
-              <a-entity geometry="primitive: circle; radius: 0.02" material="color: white; shader: flat" position="0 0 0"></a-entity>
-    </a-entity>
-
-    <a-plane rotation="-90 0 0" position="0 -0.01 0" width="100" height="100" shadow="receive: true" material="opacity: 0.3; color: #888; transparent: true; roughness: 1; metalness: 0;"></a-plane>
-
-    <a-entity ar-spawner></a-entity>
-
-  </a-scene>
+    </script>
 </body>
 </html>
