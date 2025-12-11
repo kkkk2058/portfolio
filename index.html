@@ -2,123 +2,79 @@
 <html lang="ko">
 <head>
     <meta charset="UTF-8">
-    <title>AR Crystal Spawner</title>
+    <title>AR Force Spawn</title>
     <script src="https://aframe.io/releases/1.6.0/aframe.min.js"></script>
     <style>
-        /* 터치 안내 문구 스타일 */
         #overlay {
-            position: absolute;
-            bottom: 30px;
-            left: 0;
-            width: 100%;
-            text-align: center;
-            z-index: 10;
-            pointer-events: none;
+            position: absolute; bottom: 30px; left: 0; width: 100%;
+            text-align: center; z-index: 10; pointer-events: none;
         }
         .message {
-            background: rgba(0, 0, 0, 0.6);
-            color: white;
-            padding: 10px 20px;
-            border-radius: 20px;
-            font-family: sans-serif;
-            font-size: 16px;
+            background: rgba(255, 0, 0, 0.6); color: white;
+            padding: 10px 20px; border-radius: 20px; font-size: 16px;
         }
     </style>
 </head>
 <body>
+    <div id="overlay"><span class="message">화면을 터치하면 눈앞에 나타납니다!</span></div>
 
-    <div id="overlay">
-        <span class="message">바닥을 찾고 화면을 터치하여 크리스탈을 소환하세요! ✨</span>
-    </div>
-
-    <a-scene 
-        xr-mode-ui="enabled: true; enterAREnabled: true; XRMode: ar"
-        webxr="optionalFeatures: hit-test, dom-overlay; overlayElement: #overlay"
-        ar-hit-test="target: #reticle; type: map">
+    <a-scene xr-mode-ui="enabled: true; enterAREnabled: true; XRMode: ar">
+        
+        <a-camera position="0 1.6 0">
+            <a-cursor visible="false"></a-cursor>
+        </a-camera>
 
         <a-light type="directional" intensity="1" position="-1 1 0"></a-light>
         <a-light type="ambient" intensity="0.5"></a-light>
-
-        <a-entity id="reticle" visible="false">
-            <a-ring 
-                rotation="-90 0 0" 
-                radius-inner="0.04" 
-                radius-outer="0.05" 
-                color="white" 
-                material="shader: flat; opacity: 0.8">
-            </a-ring>
-            <a-circle 
-                rotation="-90 0 0" 
-                radius="0.01" 
-                color="cyan">
-            </a-circle>
-        </a-entity>
 
     </a-scene>
 
     <script>
         const scene = document.querySelector('a-scene');
-        const reticle = document.getElementById('reticle');
 
-        // 랜덤 색상 생성기 (네온 컬러 위주)
-        function getRandomNeonColor() {
-            const colors = ['#FF00FF', '#00FFFF', '#FFFF00', '#FF0055', '#55FF00', '#0055FF'];
-            return colors[Math.floor(Math.random() * colors.length)];
+        // 랜덤 색상
+        function getRandomColor() {
+            return '#' + Math.floor(Math.random()*16777215).toString(16);
         }
 
-        // 랜덤 도형 선택
-        function getRandomShape() {
-            const shapes = ['a-octahedron', 'a-dodecahedron', 'a-icosahedron', 'a-tetrahedron'];
-            return shapes[Math.floor(Math.random() * shapes.length)];
-        }
+        // 터치 이벤트 (화면 아무데나 클릭)
+        scene.addEventListener('click', function () {
+            
+            // 1. 카메라의 현재 위치와 회전값을 가져옴
+            const camera = document.querySelector('a-camera');
+            const position = camera.getAttribute('position');
+            const rotation = camera.getAttribute('rotation');
 
-        // 화면 터치 시 실행되는 함수
-        scene.addEventListener('click', () => {
-            // 조준점(reticle)이 보일 때만(=바닥이 인식되었을 때만) 생성
-            if (reticle.visible) {
-                
-                // 1. 새로운 크리스탈 요소 생성
-                const shapeType = getRandomShape();
-                const crystal = document.createElement(shapeType);
-                
-                // 2. 위치 설정 (현재 조준점 위치 + 약간 위로 띄움)
-                const position = reticle.getAttribute('position');
-                crystal.setAttribute('position', {x: position.x, y: position.y + 0.1, z: position.z});
-                
-                // 3. 스타일 설정 (랜덤 색상, 와이어프레임 느낌)
-                const color = getRandomNeonColor();
-                crystal.setAttribute('material', `color: ${color}; roughness: 0.1; metalness: 0.5; wireframe: true; wireframeLinewidth: 2`);
-                
-                // 내부의 빛나는 핵 추가 (자식 요소)
-                const core = document.createElement('a-sphere');
-                core.setAttribute('radius', '0.05');
-                core.setAttribute('material', `color: ${color}; emissive: ${color}; emissiveIntensity: 2`);
-                crystal.appendChild(core);
+            // 2. 소환할 물체 생성
+            const box = document.createElement('a-box');
+            
+            // 3. 카메라 위치보다 Z축(앞)으로 0.5미터 떨어진 곳 계산이 복잡하므로
+            // 일단 카메라 위치에 생성하고, 카메라를 자식으로 두는 대신
+            // 간단히 "사용자 눈앞"에 띄우기 위해 카메라의 자식으로 붙였다가 떼거나,
+            // 여기서는 단순화를 위해 카메라 위치에서 약간 앞(-1)에 고정값으로 던져보겠습니다.
+            // (정확한 3D 벡터 계산 대신 가장 쉬운 방법 사용)
+            
+            // 카메라의 '현재 바라보는 방향' 벡터 구하기
+            const angle = rotation.y * (Math.PI / 180);
+            const xOffset = -Math.sin(angle) * 0.5; // 50cm 앞
+            const zOffset = -Math.cos(angle) * 0.5;
 
-                // 4. 애니메이션 추가
-                // (1) 둥둥 떠다니며 회전
-                crystal.setAttribute('animation__rotate', 'property: rotation; to: 0 360 0; loop: true; dur: 5000; easing: linear');
-                crystal.setAttribute('animation__float', 'property: position; to: ' + position.x + ' ' + (position.y + 0.2) + ' ' + position.z + '; dir: alternate; loop: true; dur: 2000; easing: easeInOutSine');
-                
-                // (2) 생성 시 "뿅" 하고 커지는 효과
-                crystal.setAttribute('scale', '0 0 0');
-                crystal.setAttribute('animation__pop', 'property: scale; to: 0.3 0.3 0.3; dur: 500; easing: easeOutElastic');
+            // 최종 위치 설정 (카메라 높이보다 조금 아래)
+            box.setAttribute('position', {
+                x: position.x + xOffset,
+                y: position.y, // 눈높이
+                z: position.z + zOffset
+            });
 
-                // 5. 씬에 추가
-                scene.appendChild(crystal);
-            }
-        });
+            // 스타일 및 애니메이션
+            box.setAttribute('material', `color: ${getRandomColor()}; transparent: true; opacity: 0.8`);
+            box.setAttribute('scale', '0.1 0.1 0.1'); // 10cm 크기
+            box.setAttribute('animation', 'property: rotation; to: 0 360 360; loop: true; dur: 3000');
+            
+            // 씬에 추가
+            scene.appendChild(box);
 
-        // AR 모드 진입 시 조준점 로직 처리
-        scene.addEventListener('ar-hit-test-start', () => {
-             // 스캔이 시작되면 안내 문구 변경 가능
-             document.querySelector('.message').innerText = "바닥을 천천히 비춰주세요...";
-        });
-        
-        // 평면을 찾았을 때 이벤트
-        reticle.addEventListener('model-loaded', () => {
-             // reticle이 활성화되면(평면 찾음) 문구 변경
-             if(reticle.visible) document.querySelector('.message').innerText = "터치하여 소환하세요!";
+            document.querySelector('.message').innerText = "소환 완료! (" + getRandomColor() + ")";
         });
     </script>
 </body>
