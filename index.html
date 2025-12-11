@@ -2,250 +2,152 @@
 <html lang="ko">
 <head>
     <meta charset="UTF-8">
-    <title>AR Magic Summoning</title>
+    <title>Native AR Magic</title>
     <script src="https://aframe.io/releases/1.6.0/aframe.min.js"></script>
-    <script src="https://unpkg.com/aframe-particle-system-component@1.1.3/dist/aframe-particle-system-component.min.js"></script>
 
     <style>
-        /* UI 안내문구 스타일 */
         #ui-layer {
             position: absolute; bottom: 30px; width: 100%; text-align: center; z-index: 10; pointer-events: none;
         }
         .btn-text {
-            background: rgba(50, 0, 100, 0.7); color: #00ffff; padding: 12px 24px; border-radius: 30px;
-            font-family: sans-serif; font-weight: bold; box-shadow: 0 0 15px #00ffff; text-shadow: 0 0 5px #00ffff;
+            background: rgba(20, 0, 50, 0.8); color: #00ffff; padding: 12px 24px; border-radius: 30px;
+            font-family: sans-serif; font-weight: bold; border: 1px solid #00ffff;
         }
     </style>
 </head>
 <body>
-    <div id="ui-layer"><span class="btn-text">✨ 화면을 터치하여 마법 정령을 소환하세요! ✨</span></div>
+    <div id="ui-layer"><span class="btn-text">👆 화면을 터치해 정령을 소환하세요!</span></div>
 
     <a-scene 
         cursor="rayOrigin: mouse" 
         raycaster="objects: none"
-        xr-mode-ui="enabled: true; enterAREnabled: true; XRMode: ar"
-        renderer="antialias: true; colorManagement: true;">
+        xr-mode-ui="enabled: true; enterAREnabled: true; XRMode: ar">
 
         <a-camera position="0 1.6 0"></a-camera>
 
-        <a-light type="directional" position="1 2 1" intensity="0.5" color="#cceeff"></a-light>
-        <a-light type="ambient" intensity="0.3" color="#330066"></a-light>
+        <a-light type="directional" position="1 4 2" intensity="0.6" color="#ccffcc"></a-light>
+        <a-light type="ambient" intensity="0.4" color="#220033"></a-light>
 
     </a-scene>
 
     <script>
-        // ✅ 1. '나를 쳐다보는' 커스텀 컴포넌트 등록
-        // 이 컴포넌트가 붙은 물체는 매 프레임마다 카메라 위치를 바라봅니다.
+        // ✅ 1. '나를 쳐다보는' 기능 (Look-At)
         AFRAME.registerComponent('look-at-camera', {
             tick: function () {
-                if (!this.el.sceneEl.camera) return; // 카메라가 아직 없으면 패스
-                const cameraPos = this.el.sceneEl.camera.el.object3D.position;
-                // object3D 레벨에서 lookAt 함수 사용
-                this.el.object3D.lookAt(cameraPos);
+                if (!this.el.sceneEl.camera) return;
+                this.el.object3D.lookAt(this.el.sceneEl.camera.el.object3D.position);
             }
         });
 
-
         const scene = document.querySelector('a-scene');
-        const uiText = document.querySelector('.btn-text');
-        const colors = ['#00ffff', '#ff00ff', '#ffff00', '#00ff00']; // 네온 컬러 팔레트
+        const colors = ['#00ffff', '#ff00ff', '#ffff00', '#55ff00'];
 
-        // ✅ 2. 터치 이벤트 리스너
+        // ✅ 2. 직접 만든 파티클 폭발 함수 (외부 라이브러리 대체)
+        function createExplosion(position, color) {
+            const particleCount = 30; // 폭발 파편 개수
+
+            for (let i = 0; i < particleCount; i++) {
+                const particle = document.createElement('a-entity');
+                
+                // 작은 사각형이나 구 모양
+                particle.setAttribute('geometry', 'primitive: box; width: 0.02; height: 0.02; depth: 0.02');
+                particle.setAttribute('material', `shader: flat; color: ${color}; transparent: true; opacity: 1`);
+                particle.setAttribute('position', position);
+
+                // 랜덤한 방향으로 퍼져나가는 벡터 계산
+                const xDir = (Math.random() - 0.5) * 2; // -1 ~ 1
+                const yDir = (Math.random() - 0.5) * 2;
+                const zDir = (Math.random() - 0.5) * 2;
+
+                // 애니메이션 1: 밖으로 퍼지기
+                particle.setAttribute('animation__move', {
+                    property: 'position',
+                    to: `${position.x + xDir} ${position.y + yDir} ${position.z + zDir}`,
+                    dur: 1000,
+                    easing: 'easeOutQuad'
+                });
+
+                // 애니메이션 2: 서서히 사라지기
+                particle.setAttribute('animation__fade', {
+                    property: 'material.opacity',
+                    to: 0,
+                    dur: 1000,
+                    easing: 'linear'
+                });
+
+                // 1초 뒤 자동 삭제 (메모리 관리)
+                setTimeout(() => {
+                    if (particle.parentNode) particle.parentNode.removeChild(particle);
+                }, 1000);
+
+                scene.appendChild(particle);
+            }
+        }
+
+        // ✅ 3. 터치 이벤트
         scene.addEventListener('click', (e) => {
-            const randomColor = colors[Math.floor(Math.random() * colors.length)];
-            
-            // 2-1. 카메라 앞 0.5m 위치 계산 (이전과 동일)
+            // 위치 계산
             const camera = document.querySelector('a-camera');
-            const position = camera.getAttribute('position');
-            const rotation = camera.getAttribute('rotation');
-            const angle = rotation.y * (Math.PI / 180);
-            const xOffset = -Math.sin(angle) * 0.5;
-            const zOffset = -Math.cos(angle) * 0.5;
-            const spawnPos = { x: position.x + xOffset, y: position.y, z: position.z + zOffset };
+            const pos = camera.getAttribute('position');
+            const rot = camera.getAttribute('rotation');
+            const angle = rot.y * (Math.PI / 180);
+            
+            // 눈앞 0.8미터 (조금 더 멀리 띄움)
+            const spawnPos = {
+                x: pos.x - Math.sin(angle) * 0.8,
+                y: pos.y, 
+                z: pos.z - Math.cos(angle) * 0.8
+            };
 
-            // --- 마법 정령(Wisp) 컨테이너 생성 ---
-            // 이 빈 엔티티가 전체 정령의 기준점이 되며, 나를 쳐다보는 역할을 합니다.
-            const wispContainer = document.createElement('a-entity');
-            wispContainer.setAttribute('position', spawnPos);
-            wispContainer.setAttribute('look-at-camera', ''); // 🔥 나를 쳐다보게 설정!
+            const randomColor = colors[Math.floor(Math.random() * colors.length)];
 
-                // ▶ (A) 마법진 파티클 폭발 효과 (생성 순간)
-                const burstParticles = document.createElement('a-entity');
-                burstParticles.setAttribute('particle-system', `
-                    preset: explosion; 
-                    color: ${randomColor}, #ffffff; 
-                    particleCount: 100; 
-                    duration: 0.5; 
-                    size: 0.5
-                `);
-                // 폭발은 1초 뒤에 스스로 삭제되도록 설정
-                setTimeout(() => { wispContainer.removeChild(burstParticles); }, 1000);
-                wispContainer.appendChild(burstParticles);
+            // 💥 1. 수제 파티클 폭발 실행
+            createExplosion(spawnPos, randomColor);
 
-                // ▶ (B) 정령의 핵심 (Core Sphere) - 고동치는 애니메이션
-                const core = document.createElement('a-sphere');
-                core.setAttribute('radius', '0.08');
-                core.setAttribute('material', `color: ${randomColor}; emissive: ${randomColor}; emissiveIntensity: 2; transparent: true; opacity: 0.9`);
-                // 둥둥 떠다니는 느낌
-                core.setAttribute('animation__float', 'property: position; to: 0 0.05 0; dir: alternate; loop: true; dur: 1500; easing: easeInOutSine');
-                // 크기가 커졌다 작아졌다 고동치는 느낌
-                core.setAttribute('animation__pulse', 'property: scale; from: 0.9 0.9 0.9; to: 1.1 1.1 1.1; dir: alternate; loop: true; dur: 800; easing: easeInOutQuad');
-                wispContainer.appendChild(core);
+            // 👻 2. 정령(Wisp) 본체 생성
+            const wisp = document.createElement('a-entity');
+            wisp.setAttribute('position', spawnPos);
+            wisp.setAttribute('look-at-camera', ''); // 나를 쳐다봄
 
-                // ▶ (C) 외곽 회전 고리 (Outer Ring) - 회전 애니메이션
-                const ring = document.createElement('a-torus');
-                ring.setAttribute('radius', '0.15');
-                ring.setAttribute('radius-tubular', '0.01');
-                ring.setAttribute('rotation', '45 0 0'); // 약간 기울임
-                ring.setAttribute('material', `color: #ffffff; emissive: ${randomColor}; emissiveIntensity: 1; wireframe: true; transparent: true; opacity: 0.5`);
-                // 뱅글뱅글 회전
-                ring.setAttribute('animation__spin', 'property: rotation; to: 45 360 0; loop: true; dur: 3000; easing: linear');
-                wispContainer.appendChild(ring);
+            // (A) 빛나는 핵
+            const core = document.createElement('a-sphere');
+            core.setAttribute('radius', '0.06');
+            core.setAttribute('material', `color: ${randomColor}; shader: flat; transparent: true; opacity: 0.8`);
+            // 고동치는 애니메이션
+            core.setAttribute('animation', 'property: scale; from: 1 1 1; to: 1.5 1.5 1.5; dir: alternate; loop: true; dur: 500');
+            wisp.appendChild(core);
 
-                // ▶ (D) 지속적인 오라 파티클 (Aura Particles)
-                const auraParticles = document.createElement('a-entity');
-                auraParticles.setAttribute('particle-system', `
-                    preset: dust; 
-                    color: ${randomColor}; 
-                    particleCount: 200; 
-                    size: 0.2; 
-                    maxAge: 2; 
-                    blending: additive;
-                    velocityValue: 0 0.1 0;
-                    positionSpread: 0.2 0.2 0.2;
-                `);
-                wispContainer.appendChild(auraParticles);
+            // (B) 회전하는 고리 1
+            const ring1 = document.createElement('a-torus');
+            ring1.setAttribute('radius', '0.12');
+            ring1.setAttribute('radius-tubular', '0.005');
+            ring1.setAttribute('material', `color: white; opacity: 0.5; transparent: true`);
+            ring1.setAttribute('animation', 'property: rotation; to: 360 360 0; loop: true; dur: 2000; easing: linear');
+            wisp.appendChild(ring1);
 
-            // 씬에 최종 추가
-            scene.appendChild(wispContainer);
+            // (C) 회전하는 고리 2 (반대 방향)
+            const ring2 = document.createElement('a-torus');
+            ring2.setAttribute('radius', '0.18');
+            ring2.setAttribute('radius-tubular', '0.002');
+            ring2.setAttribute('material', `color: ${randomColor}; opacity: 0.3; transparent: true`);
+            ring2.setAttribute('animation', 'property: rotation; to: -360 0 -360; loop: true; dur: 4000; easing: linear');
+            wisp.appendChild(ring2);
 
-            // 사운드 효과 (선택 사항 - 필요하면 주석 해제 후 사운드 파일 연결)
-            // scene.components.sound.playSound();
+            // (D) 둥둥 떠있는 움직임
+            wisp.setAttribute('animation__float', `property: position; to: ${spawnPos.x} ${spawnPos.y + 0.1} ${spawnPos.z}; dir: alternate; loop: true; dur: 1500; easing: easeInOutSine`);
 
-            uiText.innerHTML = `✨ ${randomColor} 속성 정령 소환 완료!`;
-            uiText.style.color = randomColor;
-            uiText.style.textShadow = `0 0 15px ${randomColor}`;
+            // 생성 시 작게 시작해서 커짐 (Pop 효과)
+            wisp.setAttribute('scale', '0 0 0');
+            wisp.setAttribute('animation__pop', 'property: scale; to: 1 1 1; dur: 600; easing: easeOutElastic');
+
+            scene.appendChild(wisp);
+
+            // 안내 문구 업데이트
+            const ui = document.querySelector('.btn-text');
+            ui.innerText = `✨ ${randomColor} 정령 소환됨!`;
+            ui.style.color = randomColor;
+            ui.style.borderColor = randomColor;
         });
     </script>
 </body>
 </html>
-
-<!-- <!DOCTYPE html>
-<html lang="ko">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>WebXR Debugger</title>
-    <script src="https://aframe.io/releases/1.6.0/aframe.min.js"></script>
-    
-    <style>
-        /* 화면 위에 로그를 띄우기 위한 스타일 */
-        #debug-console {
-            position: absolute;
-            top: 0;
-            left: 0;
-            width: 100%;
-            height: 50vh;
-            background: rgba(0, 0, 0, 0.7);
-            color: #00ff00; /* 잘 보이는 형광 초록색 */
-            font-family: monospace;
-            font-size: 14px;
-            padding: 10px;
-            z-index: 99999; /* 모든 것보다 위에 표시 */
-            overflow-y: scroll;
-            pointer-events: none; /* 터치 통과 */
-        }
-        .error { color: #ff5555; font-weight: bold; }
-        .warn { color: #ffff55; }
-        .success { color: #55ffff; font-weight: bold; }
-    </style>
-</head>
-<body>
-
-    <div id="debug-console">시스템 진단 시작...<br>--------------------<br></div>
-
-    <a-scene 
-        xr-mode-ui="enabled: true; enterAREnabled: true; XRMode: ar"
-        webxr="optionalFeatures: hit-test, dom-overlay; overlayElement: #debug-console"
-        renderer="logarithmicDepthBuffer: true;">
-
-        <a-box position="0 0 -1" scale="0.1 0.1 0.1" color="red" animation="property: rotation; to: 0 360 0; loop: true; dur: 2000"></a-box>
-        
-        <a-camera position="0 1.6 0"></a-camera>
-    </a-scene>
-
-    <script>
-        // 1. 로그 출력 함수
-        const consoleDiv = document.getElementById('debug-console');
-        function log(msg, type = 'normal') {
-            const span = document.createElement('span');
-            span.innerHTML = `> ${msg}<br>`;
-            if (type === 'error') span.className = 'error';
-            if (type === 'warn') span.className = 'warn';
-            if (type === 'success') span.className = 'success';
-            consoleDiv.appendChild(span);
-            console.log(msg); // 브라우저 콘솔에도 동시 출력
-        }
-
-        // 2. 진단 로직 실행
-        window.addEventListener('load', async () => {
-            log("1. 프로토콜 검사 중...");
-            const isLocalhost = location.hostname === 'localhost' || location.hostname === '127.0.0.1';
-            const isHttps = location.protocol === 'https:';
-
-            if (isHttps) {
-                log("✅ HTTPS 연결 확인됨", 'success');
-            } else if (isLocalhost) {
-                log("⚠️ 로컬호스트 접속 (PC 테스트용)", 'warn');
-            } else {
-                log("❌ 치명적 오류: HTTPS가 아닙니다!", 'error');
-                log("WebXR은 http://192.168.x.x 에서 작동하지 않습니다.", 'error');
-                log("ngrok 등을 사용하여 https 주소로 접속하세요.", 'error');
-                return; // 여기서 중단
-            }
-
-            log("2. WebXR API 지원 여부 확인...");
-            if ('xr' in navigator) {
-                log("✅ navigator.xr 객체 존재함", 'success');
-                
-                try {
-                    log("3. AR 세션('immersive-ar') 지원 하드웨어 체크...");
-                    const isSupported = await navigator.xr.isSessionSupported('immersive-ar');
-                    if (isSupported) {
-                        log("✅ 이 기기는 AR을 지원합니다!", 'success');
-                        log("💡 화면 우측 하단의 'AR' 또는 'VR' 버튼을 찾아보세요.");
-                    } else {
-                        log("❌ 이 기기는 AR 세션을 지원하지 않습니다.", 'error');
-                        log("이유 1: Google Play AR 서비스 미설치", 'warn');
-                        log("이유 2: 아이폰(iOS) WebKit 제약", 'warn');
-                        log("이유 3: 지원되지 않는 구형 기기", 'warn');
-                    }
-                } catch (e) {
-                    log(`❌ AR 체크 중 에러 발생: ${e.message}`, 'error');
-                }
-            } else {
-                log("❌ WebXR API를 찾을 수 없습니다.", 'error');
-                if (navigator.userAgent.indexOf('Chrome') === -1) {
-                    log("팁: 모바일 Chrome 브라우저를 사용해보세요.", 'warn');
-                }
-            }
-        });
-
-        // 3. A-Frame 내부 이벤트 리스너 (버튼 클릭 반응 확인)
-        const scene = document.querySelector('a-scene');
-        scene.addEventListener('enter-vr', () => {
-            log("🚀 AR/VR 모드 진입 성공!", 'success');
-        });
-        scene.addEventListener('exit-vr', () => {
-            log("반환: 일반 모드로 복귀");
-        });
-        scene.addEventListener('ar-hit-test-start', () => {
-            log("AR Hit-Test 시작됨 (카메라 인식 중)");
-        });
-        scene.addEventListener('enter-vr-error', (evt) => {
-             log(`❌ 진입 실패 에러: ${evt.detail}`, 'error');
-        });
-
-    </script>
-</body>
-</html> -->
