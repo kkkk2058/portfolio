@@ -3,20 +3,20 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
-    <title>LifeGo AR Debugger</title>
+    <title>LifeGo AR Final</title>
     
     <script src="https://aframe.io/releases/1.6.0/aframe.min.js"></script>
     <script src="https://unpkg.com/aframe-look-at-component@0.8.0/dist/aframe-look-at-component.min.js"></script>
 
     <style>
-        /* 배경 투명화 (카메라 보임 필수 설정) */
+        /* [중요] 배경 투명화: 카메라가 보이기 위한 필수 설정 */
         html, body {
             margin: 0; padding: 0; overflow: hidden;
             background-color: transparent !important;
             font-family: 'Segoe UI', sans-serif;
         }
 
-        /* 1. 시작 화면 (검은색) */
+        /* 1. 시작 화면 */
         #start-screen {
             position: absolute; top: 0; left: 0; width: 100%; height: 100%;
             background: #111; z-index: 9999;
@@ -24,126 +24,151 @@
             color: white;
         }
 
-        .btn-ar {
-            background: #00E676; border: none; padding: 20px 40px;
-            font-size: 20px; font-weight: bold; color: white; border-radius: 40px;
-            margin-top: 20px; cursor: pointer; box-shadow: 0 0 15px #00E676;
+        /* 커스텀 AR 버튼 */
+        .btn-start {
+            background: #00E676; border: none; padding: 20px 50px;
+            font-size: 22px; font-weight: bold; color: white; border-radius: 50px;
+            box-shadow: 0 0 20px rgba(0, 230, 118, 0.5); cursor: pointer;
+            margin-top: 30px;
         }
-        .btn-ar:active { transform: scale(0.95); }
+        .btn-start:active { transform: scale(0.95); }
 
-        /* 2. 게임 UI (AR 위에 뜸) */
+        /* 2. 게임 UI (AR 진입 후 보임) */
         #ar-ui {
             display: none; position: absolute; top: 0; left: 0; width: 100%; height: 100%;
             pointer-events: none; z-index: 100;
             flex-direction: column; justify-content: space-between; padding: 20px;
         }
-        
-        /* 상태창 */
-        .hud-box {
-            background: rgba(0,0,0,0.6); padding: 15px; border-radius: 10px;
-            color: white; pointer-events: auto; align-self: center; width: 90%;
-            border: 1px solid rgba(255,255,255,0.2); margin-bottom: 20px;
+
+        /* 테스트 버튼 (상단) */
+        .controls {
+            pointer-events: auto; align-self: flex-end; display: flex; flex-direction: column; gap: 10px;
+        }
+        .btn-act {
+            background: rgba(0,0,0,0.6); color: #00E676; border: 1px solid #00E676;
+            padding: 10px 15px; border-radius: 10px; font-weight: bold; cursor: pointer;
         }
 
-        /* 테스트 버튼 */
-        .test-btn {
-            pointer-events: auto; background: white; color: black; border: none;
-            padding: 10px; border-radius: 5px; font-weight: bold; align-self: flex-end;
+        /* 상태창 (하단) */
+        .hud {
+            pointer-events: auto; background: rgba(0,0,0,0.7); backdrop-filter: blur(5px);
+            padding: 15px; border-radius: 15px; color: white; width: 100%; max-width: 400px;
+            align-self: center; margin-bottom: 20px; border: 1px solid rgba(255,255,255,0.2);
         }
+        .xp-bar { width: 100%; height: 8px; background: #555; border-radius: 4px; overflow: hidden; margin-top: 5px; }
+        .xp-fill { width: 0%; height: 100%; background: #00E676; transition: width 0.3s; }
     </style>
 </head>
 <body>
 
     <div id="start-screen">
-        <h1 style="margin:0;">LifeGo AR</h1>
-        <p style="color:#aaa;">진단 모드 (Debug Mode)</p>
-        
-        <button class="btn-ar" onclick="forceStartAR()">AR 모드 시작</button>
-        
-        <div id="log-msg" style="margin-top:20px; color:red; font-size:12px; max-width:80%; text-align:center;"></div>
+        <h1>LifeGo AR</h1>
+        <p>현실 퀘스트 시스템</p>
+        <button class="btn-start" onclick="activateAR()">AR 작전 시작</button>
+        <p style="font-size:12px; color:#aaa; margin-top:20px;" id="status-msg">Ready</p>
     </div>
 
     <div id="ar-ui">
-        <button class="test-btn" onclick="spawnText()">📸 청소 감지 (테스트)</button>
-        <div class="hud-box">
-            <h2 style="margin:0; font-size:24px;">LV.46</h2>
-            <div style="background:#333; height:10px; margin-top:5px; border-radius:5px;">
-                <div id="xp-bar" style="background:#00E676; width:45%; height:100%; border-radius:5px;"></div>
+        <div class="controls">
+            <button class="btn-act" onclick="doTask('clean')">🧹 청소 (+20 XP)</button>
+            <button class="btn-act" onclick="doTask('dish')">🍽️ 설거지 (+15 XP)</button>
+        </div>
+        <div class="hud">
+            <div style="display:flex; justify-content:space-between; align-items:flex-end;">
+                <span style="font-size:24px; font-weight:bold;">LV.<span id="lvl">46</span></span>
+                <span style="font-size:12px;">XP <span id="cur">0</span>/<span id="max">100</span></span>
             </div>
-            <p style="margin:5px 0 0 0; font-size:12px;">XP: 45 / 100</p>
+            <div class="xp-bar"><div class="xp-fill" id="bar"></div></div>
         </div>
     </div>
 
     <a-scene 
         webxr="optionalFeatures: dom-overlay; overlayElement: #ar-ui; requiredFeatures: hit-test;"
-        vr-mode-ui="enabled: false"
+        vr-mode-ui="enabled: false" 
         ar-mode-ui="enabled: true; enterAREnabled: true;"
         renderer="alpha: true; antialias: true;">
         
         <a-camera position="0 1.6 0" look-controls="enabled: false"></a-camera>
-        <a-light type="ambient" intensity="1"></a-light>
+        <a-light type="ambient" intensity="0.7"></a-light>
         <a-entity id="world"></a-entity>
     </a-scene>
 
     <script>
-        // --- [진단] 버튼 클릭 시 실행되는 함수 ---
-        async function forceStartAR() {
-            const logBox = document.getElementById('log-msg');
+        let xp = 0;
+        let max = 100;
+        let lv = 46;
+
+        // --- [핵심] AR 강제 실행 함수 ---
+        async function activateAR() {
             const scene = document.querySelector('a-scene');
+            const msg = document.getElementById('status-msg');
 
-            logBox.innerText = "AR 세션 요청 중...";
+            msg.innerText = "AR 세션 요청 중...";
 
-            // 1. 브라우저가 WebXR을 지원하는지 확인
+            // 1. 브라우저 지원 여부 체크
             if (!navigator.xr) {
-                alert("❌ 오류: 이 브라우저는 WebXR을 지원하지 않습니다.\n(아이폰은 'WebXR Viewer' 앱 필요, 안드로이드는 크롬 사용 권장)");
-                logBox.innerText = "WebXR 미지원 브라우저";
+                alert("이 브라우저는 WebXR을 지원하지 않습니다. (크롬 권장)");
                 return;
             }
 
-            // 2. 'immersive-ar' (카메라 모드) 지원 여부 확인
             try {
-                const isSupported = await navigator.xr.isSessionSupported('immersive-ar');
-                if (!isSupported) {
-                    alert("❌ 오류: 이 기기는 'AR 모드'를 지원하지 않습니다.\n(Google Play AR 서비스 설치 확인 필요)");
-                    logBox.innerText = "기기가 AR 모드 미지원";
+                // 2. AR 세션이 가능한지 확인
+                const supported = await navigator.xr.isSessionSupported('immersive-ar');
+                if (!supported) {
+                    alert("이 기기는 AR 모드('immersive-ar')를 지원하지 않습니다.\n안드로이드: 구글 플레이 AR 서비스 설치 필요\n아이폰: WebXR Viewer 앱 필요");
                     return;
                 }
-            } catch (e) {
-                alert("❌ HTTPS 오류 가능성: " + e.message + "\n(반드시 https:// 주소여야 합니다)");
-                return;
-            }
 
-            // 3. 지원한다면 강제 진입 시도
-            try {
-                // A-Frame은 함수 이름이 enterVR이지만, 설정(ar-mode-ui)에 따라 AR로 들어갑니다.
+                // 3. A-Frame을 통해 AR 모드로 진입 (VR UI를 껐으므로 AR로 연결됨)
                 scene.enterVR(); 
-                
+
                 // UI 전환
                 document.getElementById('start-screen').style.display = 'none';
                 document.getElementById('ar-ui').style.display = 'flex';
-            } catch (e) {
-                alert("❌ 진입 실패: " + e);
+
+            } catch (err) {
+                alert("AR 실행 실패: " + err.message);
+                msg.innerText = "Error: " + err.message;
             }
         }
 
-        // --- 3D 텍스트 로직 ---
-        function spawnText() {
+        // --- 게임 로직 ---
+        function doTask(type) {
+            const val = type === 'clean' ? 20 : 15;
+            const title = type === 'clean' ? "Cleaning" : "Washing Dishes";
+            
+            // 3D 텍스트 생성
             const el = document.createElement('a-entity');
             const cam = document.querySelector('a-camera');
             const pos = cam.object3D.position;
+            // 카메라 정면 1.5m
             const dir = new THREE.Vector3(0,0,-1.5).applyQuaternion(cam.object3D.quaternion);
 
             el.setAttribute('position', {x:pos.x+dir.x, y:pos.y+dir.y, z:pos.z+dir.z});
             el.setAttribute('look-at', '[camera]');
-            el.innerHTML = `<a-text value="Cleaning..." align="center" scale="2 2 2"></a-text>`;
-            
+            el.innerHTML = `
+                <a-text value="${title}" align="center" position="0 0.15 0" scale="1.5 1.5 1.5"></a-text>
+                <a-plane color="#00E676" width="0.6" height="0.25">
+                    <a-text value="+${val} XP" align="center" color="black" z-offset="0.01" scale="1.5 1.5 1.5"></a-text>
+                </a-plane>
+            `;
             document.getElementById('world').appendChild(el);
-            setTimeout(() => el.remove(), 2000);
-            
-            // 게이지 증가
-            const bar = document.getElementById('xp-bar');
-            let w = parseInt(bar.style.width) || 0;
-            bar.style.width = (w + 10) + '%';
+
+            // 애니메이션
+            el.setAttribute('animation', `property: position; to: ${pos.x+dir.x} ${pos.y+dir.y+0.5} ${pos.z+dir.z}; dur: 1500; easing: easeOutQuad`);
+            setTimeout(()=> el.remove(), 1500);
+
+            // XP 증가
+            xp += val;
+            if(xp >= max) { xp -= max; lv++; max = Math.floor(max*1.1); }
+            updateHUD();
+        }
+
+        function updateHUD() {
+            document.getElementById('lvl').innerText = lv;
+            document.getElementById('cur').innerText = xp;
+            document.getElementById('max').innerText = max;
+            document.getElementById('bar').style.width = (xp/max*100) + "%";
         }
     </script>
 </body>
