@@ -3,158 +3,220 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
-    <title>LifeGo AR Debug</title>
+    <title>LifeGo AR Complete</title>
     
     <script src="https://aframe.io/releases/1.6.0/aframe.min.js"></script>
     <script src="https://unpkg.com/aframe-look-at-component@0.8.0/dist/aframe-look-at-component.min.js"></script>
 
     <style>
-        body { margin: 0; overflow: hidden; font-family: sans-serif; }
+        /* [핵심] 배경을 투명하게 설정해야 카메라가 보입니다 */
+        html, body {
+            margin: 0; padding: 0; overflow: hidden;
+            background-color: transparent !important;
+            font-family: 'Segoe UI', Roboto, sans-serif;
+        }
 
-        /* [1] 시작 화면 & 디버그 로그창 */
+        /* 1. 시작 화면 (검은 배경) */
         #start-screen {
             position: absolute; top: 0; left: 0; width: 100%; height: 100%;
             background: #111; z-index: 9999;
             display: flex; flex-direction: column; align-items: center; justify-content: center;
-            color: white;
-        }
-
-        #debug-log {
-            width: 80%; height: 150px; background: rgba(0,0,0,0.8);
-            border: 1px solid #555; overflow-y: scroll;
-            margin-bottom: 20px; padding: 10px; font-size: 12px; font-family: monospace;
-            color: #0f0; text-align: left;
+            color: white; transition: opacity 0.5s;
         }
 
         .btn-start {
-            background: #00E676; color: white; border: none;
-            padding: 15px 40px; font-size: 20px; font-weight: bold;
-            border-radius: 30px; cursor: pointer;
+            background: linear-gradient(135deg, #00C853, #64DD17);
+            border: none; padding: 18px 40px; border-radius: 50px;
+            font-size: 22px; font-weight: bold; color: white;
+            box-shadow: 0 0 20px rgba(0, 200, 83, 0.5); cursor: pointer;
+            margin-top: 20px;
         }
 
-        /* [2] 인게임 UI (숨김 상태) */
+        /* 2. 게임 UI 레이어 (AR 위에 뜸) */
         #ar-ui {
-            display: none; position: absolute; top: 0; left: 0; width: 100%; height: 100%;
-            pointer-events: none; z-index: 100;
-            flex-direction: column; justify-content: flex-end; padding: 20px;
+            display: none; /* 시작 전엔 숨김 */
+            position: absolute; top: 0; left: 0; width: 100%; height: 100%;
+            pointer-events: none; /* 배경 터치 무시 (3D 씬 전달) */
+            z-index: 100;
+            flex-direction: column; justify-content: space-between;
+            padding: 20px; box-sizing: border-box;
         }
 
-        .hud-box {
-            background: rgba(0,0,0,0.6); color: white; padding: 15px; border-radius: 10px;
-            pointer-events: auto; text-align: center; margin-bottom: 30px;
+        /* 상단 테스트 버튼 (나중에 Vision AI로 대체) */
+        .sim-controls {
+            pointer-events: auto; align-self: flex-end;
+            display: flex; flex-direction: column; gap: 10px;
+        }
+        .btn-action {
+            background: rgba(0,0,0,0.6); border: 1px solid #00E676; color: #00E676;
+            padding: 10px 15px; border-radius: 10px; font-weight: bold; cursor: pointer;
+            backdrop-filter: blur(5px);
+        }
+
+        /* 하단 상태창 (레벨/XP) */
+        .player-hud {
+            pointer-events: auto;
+            background: rgba(20, 20, 20, 0.8); backdrop-filter: blur(10px);
+            padding: 15px; border-radius: 15px; border: 1px solid rgba(255,255,255,0.1);
+            color: white; margin-bottom: 30px;
+            width: 100%; max-width: 400px; align-self: center;
+        }
+
+        .hud-row { display: flex; justify-content: space-between; align-items: flex-end; margin-bottom: 5px; }
+        .lvl-text { font-size: 24px; font-weight: 900; }
+        .xp-text { font-size: 14px; color: #aaa; }
+        
+        /* XP 게이지 */
+        .xp-track { width: 100%; height: 8px; background: rgba(255,255,255,0.2); border-radius: 4px; overflow: hidden; }
+        .xp-fill {
+            height: 100%; background: #00E676; width: 0%;
+            transition: width 0.5s ease; box-shadow: 0 0 10px #00E676;
         }
     </style>
 </head>
 <body>
 
     <div id="start-screen">
-        <h2>AR System Check</h2>
-        <div id="debug-log">Waiting for system check...<br></div>
-        <button class="btn-start" onclick="forceStartAR()">START AR (FORCE)</button>
+        <h1>LifeGo AR</h1>
+        <p>현실 퀘스트 시스템</p>
+        <button class="btn-start" onclick="startAR()">시스템 가동 (START)</button>
+        <p style="font-size:12px; color:#666; margin-top:30px;">* 카메라 권한 허용 필수</p>
     </div>
 
     <div id="ar-ui">
-        <div class="hud-box">
-            <h3>LV. 46</h3>
-            <p>UI Overlay Active</p>
-            <button onclick="spawnTestObject()" style="padding:10px; background:white; color:black; border:none; border-radius:5px;">
-                📸 Test Object
-            </button>
+        <div class="sim-controls">
+            <button class="btn-action" onclick="triggerAction('vacuuming')">🧹 청소기 돌리기 (+15 XP)</button>
+            <button class="btn-action" onclick="triggerAction('dishes')">🍽️ 설거지 하기 (+20 XP)</button>
+        </div>
+
+        <div class="player-hud">
+            <div class="hud-row">
+                <span class="lvl-text">LV.<span id="ui-lvl">46</span></span>
+                <span class="xp-text"><span id="ui-cur">0</span> / <span id="ui-max">100</span> XP</span>
+            </div>
+            <div class="xp-track">
+                <div class="xp-fill" id="ui-bar"></div>
+            </div>
         </div>
     </div>
 
     <a-scene 
-        id="scene"
-        webxr="optionalFeatures: dom-overlay, hit-test; overlayElement: #ar-ui; referenceSpaceType: local;"
+        webxr="optionalFeatures: dom-overlay; overlayElement: #ar-ui; requiredFeatures: hit-test;"
         vr-mode-ui="enabled: false"
         ar-mode-ui="enabled: true; enterAREnabled: true;"
-        renderer="alpha: true; antialias: true;">
+        renderer="alpha: true; antialias: true; colorManagement: true;">
 
         <a-camera position="0 1.6 0" look-controls="enabled: false"></a-camera>
-        <a-light type="ambient" intensity="1"></a-light>
-        <a-entity id="world-root"></a-entity>
+
+        <a-light type="ambient" intensity="0.7"></a-light>
+        <a-light type="directional" intensity="0.8" position="-1 2 1"></a-light>
+
+        <a-entity id="world-space"></a-entity>
 
     </a-scene>
 
     <script>
-        // --- [유틸] 화면에 로그 찍기 ---
-        function log(msg, type='info') {
-            const box = document.getElementById('debug-log');
-            const line = document.createElement('div');
-            line.innerText = `[${type}] ${msg}`;
-            if(type === 'error') line.style.color = 'red';
-            if(type === 'warn') line.style.color = 'yellow';
-            box.appendChild(line);
-            console.log(msg);
-        }
+        // --- [게임 데이터] ---
+        let level = 46;
+        let currentXP = 45;
+        let maxXP = 100;
 
-        // --- [진단 1] 페이지 로드 시 HTTPS 및 WebXR 지원 확인 ---
-        window.onload = function() {
-            log("System Loaded.");
-            
-            // 1. HTTPS 체크
-            if (location.protocol !== 'https:' && location.hostname !== 'localhost') {
-                log("CRITICAL: Not HTTPS! WebXR requires HTTPS.", 'error');
-                alert("주의: HTTPS 환경이 아닙니다. 카메라가 켜지지 않을 수 있습니다.");
-            } else {
-                log("HTTPS/Localhost Check OK.");
-            }
-
-            // 2. 브라우저 WebXR 지원 체크
-            if ('xr' in navigator) {
-                navigator.xr.isSessionSupported('immersive-ar').then((supported) => {
-                    if (supported) {
-                        log("Device supports Immersive AR! Ready.", 'info');
-                    } else {
-                        log("Device does NOT support Immersive AR.", 'error');
-                        log("Try Chrome on Android or WebXR Viewer on iOS.", 'warn');
-                    }
-                });
-            } else {
-                log("WebXR API not found in this browser.", 'error');
-            }
+        // 활동별 데이터
+        const ACTIONS = {
+            'vacuuming': { title: 'Vacuuming', xp: 15 },
+            'dishes': { title: 'Washing Dishes', xp: 20 }
         };
 
-        // --- [핵심] AR 강제 시작 함수 ---
-        function forceStartAR() {
+        // --- [1. AR 시작 로직] ---
+        function startAR() {
             const scene = document.querySelector('a-scene');
-            log("Attempting to enter AR mode...");
+            const startDiv = document.getElementById('start-screen');
+            const uiDiv = document.getElementById('ar-ui');
 
+            // WebXR 세션 시작 (카메라 켜기)
+            // 주의: HTTPS 환경에서만 동작합니다.
             try {
-                // A-Frame의 VR/AR 진입 메서드 호출
-                // 설정에 ar-mode-ui가 켜져있으므로 AR을 우선 시도합니다.
                 scene.enterVR(); 
-                
-                log("Request sent to Scene.");
-                
-                // UI 전환
-                setTimeout(() => {
-                    document.getElementById('start-screen').style.display = 'none';
-                    document.getElementById('ar-ui').style.display = 'flex';
-                }, 1000);
-                
-            } catch (e) {
-                log("Error entering AR: " + e.message, 'error');
+            } catch(e) {
+                alert("AR 시작 실패: HTTPS 연결을 확인하세요.");
             }
+
+            // 화면 전환 (UI 보이기)
+            startDiv.style.opacity = '0';
+            setTimeout(() => {
+                startDiv.style.display = 'none';
+                uiDiv.style.display = 'flex';
+                updateHUD(); // 초기값 표시
+            }, 500);
         }
 
-        // [테스트] 오브젝트 생성
-        function spawnTestObject() {
-            const root = document.getElementById('world-root');
-            const cam = document.querySelector('a-camera');
-            
-            // 카메라 앞 1m
-            const pos = cam.object3D.position;
-            const dir = new THREE.Vector3(0, 0, -1).applyQuaternion(cam.object3D.quaternion);
+        // --- [2. 행동 감지 및 3D 텍스트 생성] ---
+        function triggerAction(key) {
+            const data = ACTIONS[key];
+            const container = document.getElementById('world-space');
+            const camera = document.querySelector('a-camera');
 
-            const el = document.createElement('a-box');
-            el.setAttribute('position', {x: pos.x + dir.x, y: pos.y + dir.y, z: pos.z + dir.z});
-            el.setAttribute('color', 'red');
-            el.setAttribute('scale', '0.2 0.2 0.2');
-            el.setAttribute('look-at', '[camera]');
+            // 1) 위치 계산: 카메라가 보고 있는 방향 1.5m 앞
+            const pos = camera.object3D.position;
+            const dir = new THREE.Vector3(0, 0, -1.5).applyQuaternion(camera.object3D.quaternion);
             
-            root.appendChild(el);
-            log("Object Spawned at " + Math.round(pos.x));
+            // 2) 3D 요소 생성 (HTML String 활용)
+            const el = document.createElement('a-entity');
+            el.setAttribute('position', {x: pos.x + dir.x, y: pos.y + dir.y, z: pos.z + dir.z});
+            el.setAttribute('look-at', '[camera]'); // 텍스트가 나를 바라봄
+
+            el.innerHTML = `
+                <a-text value="${data.title}" align="center" position="0 0.2 0" scale="1.5 1.5 1.5" color="#ffffff" font="mozillavr"></a-text>
+                <a-entity position="0 -0.15 0">
+                    <a-plane color="#00E676" width="0.7" height="0.25" opacity="0.9"></a-plane>
+                    <a-text value="+${data.xp} XP" align="center" z-offset="0.01" scale="1.5 1.5 1.5" color="#000"></a-text>
+                </a-entity>
+            `;
+
+            container.appendChild(el);
+
+            // 3) 애니메이션 (위로 둥둥 + 사라짐)
+            el.setAttribute('animation', {
+                property: 'position',
+                to: `${pos.x + dir.x} ${pos.y + dir.y + 0.6} ${pos.z + dir.z}`,
+                dur: 2000,
+                easing: 'easeOutQuad'
+            });
+
+            // 2초 뒤 삭제
+            setTimeout(() => { 
+                if(el.parentNode) el.parentNode.removeChild(el); 
+            }, 2000);
+
+            // 4) 경험치 반영
+            addXP(data.xp);
+        }
+
+        // --- [3. 레벨업 시스템] ---
+        function addXP(amount) {
+            currentXP += amount;
+            
+            // 레벨업 체크
+            if (currentXP >= maxXP) {
+                currentXP -= maxXP;
+                level++;
+                maxXP = Math.floor(maxXP * 1.1); // 다음 레벨은 더 어렵게
+                
+                // 레벨업 효과 (텍스트 색상 깜빡임)
+                const lvlTxt = document.querySelector('.lvl-text');
+                lvlTxt.style.color = '#FFD700'; // 금색
+                setTimeout(() => lvlTxt.style.color = 'white', 1000);
+            }
+            updateHUD();
+        }
+
+        function updateHUD() {
+            document.getElementById('ui-lvl').innerText = level;
+            document.getElementById('ui-cur').innerText = currentXP;
+            document.getElementById('ui-max').innerText = maxXP;
+            
+            const pct = Math.min((currentXP / maxXP) * 100, 100);
+            document.getElementById('ui-bar').style.width = `${pct}%`;
         }
     </script>
 </body>
