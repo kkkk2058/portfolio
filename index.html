@@ -3,17 +3,24 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
-    <title>LifeGo AR: v3.0 Ultimate</title>
+    <title>LifeGo AR: v4.0 JARVIS</title>
     
     <script src="https://aframe.io/releases/1.6.0/aframe.min.js"></script>
     <script src="https://unpkg.com/aframe-look-at-component@0.8.0/dist/aframe-look-at-component.min.js"></script>
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <script src="https://cdn.jsdelivr.net/npm/canvas-confetti@1.6.0/dist/confetti.browser.min.js"></script>
 
     <style>
-        /* --- 기본 설정 --- */
-        body { margin: 0; overflow: hidden; background: #000; font-family: 'Segoe UI', sans-serif; user-select: none; }
+        /* --- 기본 UI 변수 (테마 변경용) --- */
+        :root {
+            --main-color: #00E676; /* 기본 초록 */
+            --bg-glass: rgba(0, 20, 30, 0.75);
+        }
+        body.theme-gold { --main-color: #FFD700; --bg-glass: rgba(40, 30, 0, 0.75); }
+        body.theme-red { --main-color: #FF1744; --bg-glass: rgba(40, 0, 0, 0.75); }
+
+        body { margin: 0; overflow: hidden; background: #000; font-family: 'Segoe UI', sans-serif; user-select: none; transition: all 0.5s; }
         
-        /* 카메라 배경 */
         #camera-feed {
             position: absolute; top: 0; left: 0; width: 100%; height: 100%;
             object-fit: cover; z-index: 1; transform: scaleX(-1);
@@ -27,65 +34,65 @@
             padding: 15px; box-sizing: border-box;
         }
 
-        /* --- [UPGRADE] 상점 (Shop) 모달 --- */
-        #shop-modal {
-            display: none; position: absolute; top: 50%; left: 50%;
-            transform: translate(-50%, -50%); width: 85%; max-width: 400px;
-            background: rgba(10, 20, 30, 0.95); border: 1px solid #00E676;
-            border-radius: 15px; padding: 20px; z-index: 999; pointer-events: auto;
-            box-shadow: 0 0 30px rgba(0,230,118,0.3); color: white;
+        /* 음성 인식 상태 표시기 */
+        #voice-status {
+            position: absolute; top: 20px; left: 50%; transform: translateX(-50%);
+            background: rgba(0,0,0,0.6); padding: 8px 15px; border-radius: 20px;
+            color: white; font-size: 12px; display: flex; align-items: center; gap: 8px;
+            border: 1px solid var(--main-color);
         }
-        .shop-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px; border-bottom: 1px solid #333; padding-bottom: 10px; }
-        .shop-items { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
-        .shop-item {
-            background: rgba(255,255,255,0.05); border-radius: 10px; padding: 10px;
-            text-align: center; border: 1px solid transparent; transition: 0.2s; cursor: pointer;
+        .pulse-dot {
+            width: 8px; height: 8px; background: red; border-radius: 50%;
+            animation: pulse 1s infinite;
         }
-        .shop-item:hover { border-color: #00E676; background: rgba(0,230,118,0.1); }
-        .item-icon { font-size: 30px; margin-bottom: 5px; display: block; }
-        .item-price { color: #FFD700; font-weight: bold; font-size: 14px; }
-        .close-btn { background: none; border: none; color: #aaa; font-size: 20px; cursor: pointer; }
+        @keyframes pulse { 0% { opacity: 1; } 50% { opacity: 0.3; } 100% { opacity: 1; } }
 
-        /* --- UI Components --- */
+        /* 프로필 & 퀘스트 */
         .profile-panel {
-            pointer-events: auto; background: rgba(0, 20, 40, 0.7); backdrop-filter: blur(10px);
-            border-left: 4px solid #00E676; padding: 10px 15px; border-radius: 0 15px 15px 0;
+            pointer-events: auto; background: var(--bg-glass); backdrop-filter: blur(10px);
+            border-left: 4px solid var(--main-color); padding: 10px 15px; border-radius: 0 15px 15px 0;
             color: white; display: inline-flex; align-items: center; gap: 12px;
-            box-shadow: 0 5px 15px rgba(0,0,0,0.3);
         }
-        .user-avatar { width: 40px; height: 40px; border-radius: 50%; background: #333 url('https://cdn-icons-png.flaticon.com/512/4140/4140048.png') center/cover; border: 2px solid white; }
-        
-        /* 퀘스트 패널 */
+        .user-avatar { width: 45px; height: 45px; border-radius: 50%; background: #333 url('https://cdn-icons-png.flaticon.com/512/4140/4140048.png') center/cover; border: 2px solid white; }
+
         .quest-panel { pointer-events: auto; margin-top: 10px; align-self: flex-end; width: 220px; }
         .quest-list { background: rgba(0,0,0,0.6); backdrop-filter: blur(5px); padding: 10px; border-radius: 10px; color: white; border: 1px solid rgba(255,255,255,0.1); }
         .quest-item { display: flex; justify-content: space-between; margin-bottom: 8px; font-size: 13px; align-items: center; }
-        .quest-check { color: #00E676; margin-right: 5px; }
         .quest-item.done { text-decoration: line-through; opacity: 0.5; color: #aaa; }
 
-        /* 하단 컨트롤 */
+        /* 하단 스탯 */
         .bottom-hud { width: 100%; display: flex; flex-direction: column; gap: 10px; }
-        
         .action-row { pointer-events: auto; display: flex; justify-content: center; gap: 10px; }
         .btn-act {
             background: rgba(0,0,0,0.6); color: white; border: 1px solid #555;
             padding: 8px 15px; border-radius: 20px; font-size: 13px; cursor: pointer;
             display: flex; align-items: center; gap: 5px; backdrop-filter: blur(4px);
         }
-        .btn-act:active { transform: scale(0.95); background: rgba(0,230,118,0.3); }
-
         .btn-shop { background: linear-gradient(135deg, #FFD700, #FFA000); color: black; border: none; font-weight: bold; }
 
-        /* 스탯 바 */
         .status-bar {
-            pointer-events: auto; background: rgba(10, 10, 10, 0.85); backdrop-filter: blur(15px);
+            pointer-events: auto; background: var(--bg-glass); backdrop-filter: blur(15px);
             border-radius: 15px; padding: 15px 20px; border: 1px solid rgba(255,255,255,0.1);
+            transition: background 0.5s;
         }
-        .stat-top { display: flex; justify-content: space-between; align-items: flex-end; }
-        .lvl { font-size: 28px; font-weight: 900; color: white; line-height: 1; }
-        .coin { color: #FFD700; font-weight: bold; font-size: 16px; }
-        
+        .lvl { font-size: 28px; font-weight: 900; color: white; }
+        .coin { color: #FFD700; font-weight: bold; }
         .xp-track { width: 100%; height: 10px; background: #333; border-radius: 5px; margin-top: 8px; overflow: hidden; }
-        .xp-fill { height: 100%; background: #00E676; width: 0%; transition: width 0.5s cubic-bezier(0.34, 1.56, 0.64, 1); box-shadow: 0 0 10px #00E676; }
+        .xp-fill { height: 100%; background: var(--main-color); width: 0%; transition: width 0.5s; box-shadow: 0 0 10px var(--main-color); }
+
+        /* 상점 모달 */
+        #shop-modal {
+            display: none; position: absolute; top: 50%; left: 50%;
+            transform: translate(-50%, -50%); width: 85%; max-width: 400px;
+            background: rgba(10, 20, 30, 0.95); border: 2px solid var(--main-color);
+            border-radius: 15px; padding: 20px; z-index: 999; pointer-events: auto; color: white;
+        }
+        .shop-items { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-top: 15px; }
+        .shop-item {
+            background: rgba(255,255,255,0.05); border-radius: 10px; padding: 15px;
+            text-align: center; border: 1px solid transparent; cursor: pointer;
+        }
+        .shop-item:hover { border-color: var(--main-color); background: rgba(255,255,255,0.1); }
 
         /* 시작 화면 */
         #start-overlay { position: absolute; top:0; left:0; width:100%; height:100%; background: #080808; z-index: 9999; display: flex; flex-direction: column; align-items: center; justify-content: center; color: white; }
@@ -96,45 +103,40 @@
 
     <audio id="sfx-coin" src="https://assets.mixkit.co/sfx/preview/mixkit-winning-chimes-2015.mp3"></audio>
     <audio id="sfx-level" src="https://assets.mixkit.co/sfx/preview/mixkit-arcade-game-jump-coin-216.mp3"></audio>
-    <audio id="sfx-click" src="https://assets.mixkit.co/sfx/preview/mixkit-modern-technology-select-3124.mp3"></audio>
 
     <video id="camera-feed" autoplay playsinline muted></video>
 
     <div id="start-overlay">
-        <h1 style="color:#00E676; font-size:40px; margin:0;">LIFEGO v3.0</h1>
-        <p style="color:#aaa;">Gamification of Reality</p>
-        <button class="btn-main" onclick="initApp()">SYSTEM START</button>
-        <p id="save-msg" style="color:#FFD700; font-size:12px; margin-top:20px; display:none;">💾 데이터 로드됨</p>
+        <h1 style="color:#00E676; font-size:40px; margin:0; text-shadow:0 0 15px #00E676;">LIFEGO v4.0</h1>
+        <p style="color:#aaa;">AI & Voice Integration</p>
+        <button class="btn-main" onclick="initApp()">SYSTEM ONLINE</button>
+    </div>
+
+    <div id="voice-status" style="display:none;">
+        <div class="pulse-dot"></div>
+        <span id="voice-text">Listening...</span>
     </div>
 
     <div id="shop-modal">
-        <div class="shop-header">
-            <span><i class="fas fa-shopping-cart"></i> REWARD SHOP</span>
-            <button class="close-btn" onclick="toggleShop()"><i class="fas fa-times"></i></button>
-        </div>
-        <div style="text-align:right; margin-bottom:10px; color:#FFD700; font-weight:bold;">
-            보유: <span id="shop-coin">0</span> G
+        <div style="display:flex; justify-content:space-between;">
+            <span style="font-weight:bold; color:var(--main-color);">🛒 EQUIPMENT SHOP</span>
+            <button onclick="toggleShop()" style="background:none; border:none; color:white;">✕</button>
         </div>
         <div class="shop-items">
-            <div class="shop-item" onclick="buyItem('coffee', 500)">
-                <span class="item-icon">☕</span>
-                <div>커피 한 잔</div>
-                <div class="item-price">500 G</div>
-            </div>
-            <div class="shop-item" onclick="buyItem('rest', 1000)">
-                <span class="item-icon">🎮</span>
-                <div>30분 휴식권</div>
-                <div class="item-price">1,000 G</div>
-            </div>
-            <div class="shop-item" onclick="buyItem('snack', 300)">
-                <span class="item-icon">🍩</span>
-                <div>간식 타임</div>
-                <div class="item-price">300 G</div>
-            </div>
-            <div class="shop-item" onclick="buyItem('theme', 5000)">
-                <span class="item-icon">🎨</span>
+            <div class="shop-item" onclick="buyTheme('gold', 100)">
+                <div style="font-size:30px;">🎨</div>
                 <div>골드 테마</div>
-                <div class="item-price">5,000 G</div>
+                <div style="color:#FFD700; font-size:12px;">100 G</div>
+            </div>
+            <div class="shop-item" onclick="buyTheme('red', 100)">
+                <div style="font-size:30px;">🔴</div>
+                <div>T1 레드 테마</div>
+                <div style="color:#FFD700; font-size:12px;">100 G</div>
+            </div>
+            <div class="shop-item" onclick="buyTheme('green', 0)">
+                <div style="font-size:30px;">🟢</div>
+                <div>기본 테마</div>
+                <div style="color:#FFD700; font-size:12px;">FREE</div>
             </div>
         </div>
     </div>
@@ -144,32 +146,27 @@
             <div class="profile-panel">
                 <div class="user-avatar"></div>
                 <div>
-                    <div style="font-size:11px; color:#00E676;">PLAYER</div>
+                    <div style="font-size:11px; color:var(--main-color);">OPERATOR</div>
                     <div style="font-weight:bold;">SEHOON KIM</div>
                 </div>
             </div>
             <div class="quest-panel">
-                <div style="font-weight:bold; margin-bottom:5px; color:#00E676;">📋 QUESTS</div>
+                <div style="font-weight:bold; margin-bottom:5px; color:var(--main-color);">📋 MISSION LOG</div>
                 <div class="quest-list" id="quest-list-ui"></div>
             </div>
         </div>
 
         <div class="bottom-hud">
             <div class="action-row">
-                <button class="btn-act" onclick="completeAction('clean')"><i class="fas fa-broom"></i> 청소</button>
-                <button class="btn-act" onclick="completeAction('dish')"><i class="fas fa-soap"></i> 설거지</button>
+                <button class="btn-act" onclick="toggleSim()"><i class="fas fa-robot"></i> AI 감지 모드</button>
                 <button class="btn-act btn-shop" onclick="toggleShop()"><i class="fas fa-store"></i> 상점</button>
             </div>
-
             <div class="status-bar">
-                <div class="stat-top">
-                    <div><span class="lvl">LV.<span id="ui-lvl">1</span></span></div>
-                    <div class="coin"><i class="fas fa-coins"></i> <span id="ui-coin">0</span></div>
+                <div style="display:flex; justify-content:space-between;">
+                    <span class="lvl">LV.<span id="ui-lvl">1</span></span>
+                    <span class="coin"><i class="fas fa-coins"></i> <span id="ui-coin">0</span></span>
                 </div>
                 <div class="xp-track"><div class="xp-fill" id="ui-bar"></div></div>
-                <div style="text-align:right; font-size:11px; color:#aaa; margin-top:3px;">
-                    XP <span id="ui-cur">0</span> / <span id="ui-max">100</span>
-                </div>
             </div>
         </div>
     </div>
@@ -178,167 +175,174 @@
         <a-scene embedded vr-mode-ui="enabled: false" renderer="alpha: true; antialias: true;">
             <a-camera position="0 1.6 0" look-controls="enabled: true"></a-camera>
             <a-light type="ambient" intensity="0.8"></a-light>
-            <a-light type="directional" intensity="1" position="-1 2 1"></a-light>
             <a-entity id="world-space"></a-entity>
         </a-scene>
     </div>
 
     <script>
-        // --- [UPGRADE] 사운드 매니저 ---
-        const SFX = {
-            coin: document.getElementById('sfx-coin'),
-            level: document.getElementById('sfx-level'),
-            click: document.getElementById('sfx-click'),
-            play: (name) => {
-                const sound = SFX[name];
-                if(sound) { sound.currentTime = 0; sound.play().catch(e=>{}); }
-            }
-        };
-
-        // --- 게임 데이터 ---
-        let game = {
-            level: 1,
-            xp: 0,
-            maxXp: 100,
-            coins: 0,
-            quests: [
-                { id: 'clean', title: '방 청소하기', xp: 50, gold: 100, done: false },
-                { id: 'dish', title: '설거지 하기', xp: 30, gold: 50, done: false }
-            ]
-        };
-
-        // --- [UPGRADE] 데이터 저장/로드 (LocalStorage) ---
-        function loadData() {
-            const saved = localStorage.getItem('lifego_save_v1');
-            if (saved) {
-                game = JSON.parse(saved);
-                document.getElementById('save-msg').style.display = 'block';
-            }
-        }
-        function saveData() {
-            localStorage.setItem('lifego_save_v1', JSON.stringify(game));
-        }
+        // --- Game State ---
+        let game = { level: 46, xp: 0, maxXp: 100, coins: 500, quests: [] };
+        let isSimulating = false; // AI 감지 모드 상태
 
         // --- 초기화 ---
         async function initApp() {
-            SFX.play('click');
-            loadData(); // 데이터 로드
+            game.quests = [
+                { id: 'water', title: '물 마시기', xp: 10, gold: 20, done: false },
+                { id: 'clean', title: '청소하기', xp: 50, gold: 100, done: false }
+            ];
+            
             try {
                 const stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: "environment" } });
                 document.getElementById('camera-feed').srcObject = stream;
-                
                 document.getElementById('start-overlay').style.display = 'none';
                 document.getElementById('ui-layer').style.display = 'flex';
-                updateUI();
-            } catch (e) {
-                alert("카메라 권한 필수: " + e.message);
-            }
-        }
-
-        // --- 액션 수행 ---
-        function completeAction(type) {
-            const quest = game.quests.find(q => q.id === type);
-            if(!quest) return;
-
-            // 1. 효과음
-            SFX.play('coin');
-
-            // 2. 3D 효과 (파티클 느낌 추가)
-            spawn3DEffect(quest.title, quest.xp, quest.gold);
-
-            // 3. 보상
-            game.xp += quest.xp;
-            game.coins += quest.gold;
-            quest.done = true; // 퀘스트 완료 처리 (단순화를 위해 반복 가능하게 하려면 false 유지)
-            
-            checkLevelUp();
-            updateUI();
-            saveData(); // 자동 저장
-        }
-
-        // --- 레벨업 체크 ---
-        function checkLevelUp() {
-            if (game.xp >= game.maxXp) {
-                game.xp -= game.maxXp;
-                game.level++;
-                game.maxXp = Math.floor(game.maxXp * 1.2);
-                SFX.play('level');
+                document.getElementById('voice-status').style.display = 'flex';
                 
-                // 레벨업 시각 효과 (간단)
-                alert(`🎉 LEVEL UP! Lv.${game.level} 달성!`);
+                updateUI();
+                initVoice(); // 음성 인식 시작
+                
+            } catch (e) {
+                alert("Error: " + e.message);
             }
         }
 
-        // --- UI 업데이트 ---
-        function updateUI() {
-            document.getElementById('ui-lvl').innerText = game.level;
-            document.getElementById('ui-coin').innerText = game.coins.toLocaleString();
-            document.getElementById('shop-coin').innerText = game.coins.toLocaleString();
-            document.getElementById('ui-cur').innerText = game.xp;
-            document.getElementById('ui-max').innerText = game.maxXp;
-            document.getElementById('ui-bar').style.width = Math.min((game.xp/game.maxXp)*100, 100) + "%";
-
-            // 퀘스트 리스트 렌더링
-            const list = document.getElementById('quest-list-ui');
-            list.innerHTML = '';
-            game.quests.forEach(q => {
-                list.innerHTML += `
-                    <div class="quest-item ${q.done ? 'done' : ''}">
-                        <span><i class="fas ${q.done ? 'fa-check-circle' : 'fa-circle'} quest-check"></i> ${q.title}</span>
-                        <span style="color:#FFD700; font-size:11px;">+${q.gold}G</span>
-                    </div>`;
+        // --- 1. 🎉 파티클 시스템 (Confetti) ---
+        function fireConfetti() {
+            confetti({
+                particleCount: 100, spread: 70, origin: { y: 0.6 },
+                colors: ['#00E676', '#FFD700', '#FFFFFF']
             });
         }
 
-        // --- [UPGRADE] 상점 로직 ---
-        function toggleShop() {
-            SFX.play('click');
-            const modal = document.getElementById('shop-modal');
-            modal.style.display = modal.style.display === 'block' ? 'none' : 'block';
+        // --- 2. 🎙️ 음성 인식 (Web Speech API) ---
+        function initVoice() {
+            if (!('webkitSpeechRecognition' in window)) {
+                document.getElementById('voice-text').innerText = "Voice Not Supported";
+                return;
+            }
+            
+            const recognition = new webkitSpeechRecognition();
+            recognition.continuous = true;
+            recognition.lang = 'ko-KR';
+            recognition.interimResults = false;
+
+            recognition.onresult = function(event) {
+                const last = event.results.length - 1;
+                const command = event.results[last][0].transcript.trim();
+                console.log("Voice Command:", command);
+                document.getElementById('voice-text').innerText = `"${command}"`;
+                
+                // 명령어 처리
+                if (command.includes("상점")) toggleShop();
+                else if (command.includes("닫아")) document.getElementById('shop-modal').style.display = 'none';
+                else if (command.includes("청소")) processAction('clean');
+                else if (command.includes("물")) processAction('water');
+                
+                setTimeout(() => document.getElementById('voice-text').innerText = "Listening...", 2000);
+            };
+            
+            recognition.start();
         }
 
-        function buyItem(item, price) {
-            if(game.coins >= price) {
+        // --- 3. 🎨 테마 변경 시스템 ---
+        function buyTheme(color, price) {
+            if (game.coins >= price) {
                 game.coins -= price;
-                SFX.play('coin');
-                alert("구매 완료! (실제 보상으로 교환하세요)");
+                document.body.className = `theme-${color}`; // CSS 변수 변경
+                fireConfetti(); // 축하 폭죽
+                document.getElementById('sfx-coin').play();
                 updateUI();
-                saveData();
+                alert(`${color.toUpperCase()} 테마 적용 완료!`);
             } else {
-                alert("골드가 부족합니다!");
+                alert("골드가 부족합니다.");
             }
         }
 
-        // --- [UPGRADE] 화려한 3D 텍스트 & 코인 효과 ---
-        function spawn3DEffect(text, xp, gold) {
+        // --- 4. 📡 AI 감지 시뮬레이션 (Mock Socket) ---
+        function toggleSim() {
+            isSimulating = !isSimulating;
+            const btn = document.querySelector('.btn-act');
+            
+            if(isSimulating) {
+                btn.innerHTML = `<i class="fas fa-circle-notch fa-spin"></i> 감지 중...`;
+                btn.style.borderColor = "#FFD700";
+                
+                // 3초마다 랜덤 이벤트 발생 (실제 서버 연결 시 socket.on('event')로 대체)
+                window.simInterval = setInterval(() => {
+                    const actions = ['water', 'clean'];
+                    const randomAct = actions[Math.floor(Math.random() * actions.length)];
+                    processAction(randomAct);
+                }, 4000);
+                
+            } else {
+                btn.innerHTML = `<i class="fas fa-robot"></i> AI 감지 모드`;
+                btn.style.borderColor = "#555";
+                clearInterval(window.simInterval);
+            }
+        }
+
+        // --- 공통 액션 처리 ---
+        function processAction(id) {
+            const q = game.quests.find(x => x.id === id);
+            if (!q) return;
+
+            // 3D 효과 생성
+            spawn3D(q.title, q.xp, q.gold);
+            
+            // 데이터 업데이트
+            game.xp += q.xp;
+            game.coins += q.gold;
+            document.getElementById('sfx-coin').play();
+            
+            if (game.xp >= game.maxXp) {
+                game.level++;
+                game.xp -= game.maxXp;
+                document.getElementById('sfx-level').play();
+                fireConfetti(); // 레벨업 시 대형 폭죽
+            }
+            
+            updateUI();
+        }
+
+        function updateUI() {
+            document.getElementById('ui-lvl').innerText = game.level;
+            document.getElementById('ui-coin').innerText = game.coins;
+            document.getElementById('ui-bar').style.width = (game.xp / game.maxXp * 100) + "%";
+            
+            const list = document.getElementById('quest-list-ui');
+            list.innerHTML = '';
+            game.quests.forEach(q => {
+                list.innerHTML += `<div class="quest-item"><span>${q.title}</span><span style="color:var(--main-color);">+${q.gold}G</span></div>`;
+            });
+        }
+
+        function toggleShop() {
+            const el = document.getElementById('shop-modal');
+            el.style.display = el.style.display === 'block' ? 'none' : 'block';
+        }
+
+        function spawn3D(text, xp, gold) {
             const el = document.createElement('a-entity');
             const cam = document.querySelector('a-camera');
             const pos = cam.object3D.position;
-            const dir = new THREE.Vector3(0, 0, -2).applyQuaternion(cam.object3D.quaternion);
+            const dir = new THREE.Vector3(0,0,-1.5).applyQuaternion(cam.object3D.quaternion);
 
-            el.setAttribute('position', {x: pos.x + dir.x, y: pos.y + dir.y, z: pos.z + dir.z});
+            el.setAttribute('position', {x:pos.x+dir.x, y:pos.y+dir.y, z:pos.z+dir.z});
             el.setAttribute('look-at', '[camera]');
-
-            // 텍스트 + 회전하는 코인 모델(원형) 시뮬레이션
-            el.innerHTML = `
-                <a-text value="${text}" align="center" position="0 0.3 0" scale="2 2 2" color="#fff" font="mozillavr"></a-text>
-                <a-entity position="0 0 0" animation="property: rotation; to: 0 360 0; loop: true; dur: 2000">
-                    <a-circle color="#FFD700" radius="0.15" position="-0.6 0 0.1"></a-circle>
-                    <a-circle color="#FFD700" radius="0.15" position="0.6 0 0.1"></a-circle>
-                </a-entity>
-                <a-entity position="0 -0.2 0">
-                    <a-plane color="#000" opacity="0.8" width="1.4" height="0.5"></a-plane>
-                    <a-text value="+${xp} XP  +${gold} G" align="center" color="#00E676" scale="2.5 2.5 2.5" z-offset="0.01"></a-text>
-                </a-entity>
-            `;
-
-            document.getElementById('world-space').appendChild(el);
-
-            // 위로 떠오르며 사라지는 애니메이션
-            el.setAttribute('animation', `property: position; to: ${pos.x + dir.x} ${pos.y + dir.y + 0.8} ${pos.z + dir.z}; dur: 1500; easing: easeOutQuad`);
-            el.setAttribute('animation__scale', `property: scale; to: 0 0 0; delay: 1000; dur: 500;`);
             
-            setTimeout(() => { if(el.parentNode) el.parentNode.removeChild(el); }, 1500);
+            // 테마 색상 적용
+            const color = getComputedStyle(document.body).getPropertyValue('--main-color').trim();
+
+            el.innerHTML = `
+                <a-text value="${text}" align="center" position="0 0.2 0" scale="2 2 2"></a-text>
+                <a-plane color="black" opacity="0.7" width="1.2" height="0.4">
+                    <a-text value="+${xp} XP | +${gold} G" align="center" color="${color}" scale="2 2 2" z-offset="0.01"></a-text>
+                </a-plane>
+            `;
+            document.getElementById('world-space').appendChild(el);
+            
+            el.setAttribute('animation', `property: position; to: ${pos.x+dir.x} ${pos.y+dir.y+0.5} ${pos.z+dir.z}; dur: 1500`);
+            setTimeout(() => el.remove(), 1500);
         }
     </script>
 </body>
