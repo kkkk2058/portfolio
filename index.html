@@ -3,97 +3,127 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
-    <title>LifeGo AR Quest System</title>
+    <title>LifeGo AR Complete</title>
     
     <script src="https://aframe.io/releases/1.6.0/aframe.min.js"></script>
     <script src="https://unpkg.com/aframe-look-at-component@0.8.0/dist/aframe-look-at-component.min.js"></script>
 
     <style>
-        /* --- 2D HUD 스타일 (기존 디자인 유지) --- */
-        body { margin: 0; overflow: hidden; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; }
-        
-        #ar-ui {
+        body { margin: 0; overflow: hidden; font-family: 'Segoe UI', sans-serif; }
+
+        /* --- 1. 커스텀 시작 화면 (Start Screen) --- */
+        #start-screen {
             position: absolute;
             top: 0; left: 0; width: 100%; height: 100%;
-            pointer-events: none; /* UI 배경은 클릭 통과 (3D 씬 조작 가능) */
-            z-index: 100;
+            background: rgba(18, 18, 18, 0.95);
+            z-index: 9999;
             display: flex;
             flex-direction: column;
-            justify-content: flex-end; /* 하단 배치 */
+            justify-content: center;
+            align-items: center;
+            color: white;
+            transition: opacity 0.5s ease;
+        }
+
+        .ar-btn-main {
+            background: linear-gradient(135deg, #00e676, #00c853);
+            border: none;
+            padding: 18px 40px;
+            font-size: 22px;
+            font-weight: 800;
+            color: white;
+            border-radius: 50px;
+            box-shadow: 0 0 25px rgba(0, 230, 118, 0.5);
+            cursor: pointer;
+            letter-spacing: 1px;
+            margin-top: 30px;
+            transition: transform 0.2s;
+        }
+        .ar-btn-main:active { transform: scale(0.95); }
+
+        /* --- 2. 게임 UI (HUD) - 처음엔 숨김 --- */
+        #ar-ui {
+            display: none; /* 시작 전엔 안보임 */
+            position: absolute;
+            top: 0; left: 0; width: 100%; height: 100%;
+            pointer-events: none;
+            z-index: 100;
+            flex-direction: column;
+            justify-content: space-between; /* 위아래 분배 */
             padding: 20px;
             box-sizing: border-box;
         }
 
-        /* 플레이어 상태창 (좌측 하단) */
-        .player-stats {
-            background: rgba(0, 0, 0, 0.6); /* 반투명 검정 배경 */
-            backdrop-filter: blur(5px);
-            border-radius: 15px;
-            padding: 15px;
-            width: 280px;
-            color: white;
-            border: 1px solid rgba(255, 255, 255, 0.2);
-            pointer-events: auto; /* 버튼 등은 클릭 가능해야 함 */
-            margin-bottom: 20px; /* AR 버튼과 겹치지 않게 */
-        }
-
-        .avatar-row { display: flex; align-items: center; gap: 10px; margin-bottom: 8px; }
-        .avatar { width: 45px; height: 45px; border-radius: 50%; background: #ddd url('https://cdn-icons-png.flaticon.com/512/4140/4140048.png') center/cover; border: 2px solid #fff; }
-        .level-info { display: flex; flex-direction: column; }
-        .level-badge { font-size: 20px; font-weight: bold; color: #fff; text-shadow: 0 0 5px rgba(0,0,0,0.5); }
-        .streak-badge { font-size: 14px; color: #ff9500; font-weight: bold; }
-
-        /* 경험치 바 */
-        .xp-bar-container {
-            width: 100%; height: 10px; background: rgba(255,255,255,0.2);
-            border-radius: 5px; overflow: hidden; margin-top: 5px;
-        }
-        .xp-fill {
-            height: 100%; background: linear-gradient(90deg, #00e676, #00c853);
-            width: 0%; /* JS로 제어 */
-            box-shadow: 0 0 10px #00e676;
-            transition: width 0.5s cubic-bezier(0.4, 0, 0.2, 1);
-        }
-        .xp-text { font-size: 12px; margin-top: 4px; text-align: right; opacity: 0.9; font-weight: bold; }
-
-        /* 시뮬레이션 버튼 (테스트용) */
+        /* 테스트용 시뮬레이션 버튼들 (상단) */
         #sim-controls {
-            position: absolute;
-            top: 20px; right: 20px;
+            align-self: flex-end;
             pointer-events: auto;
             display: flex; flex-direction: column; gap: 10px;
+            margin-top: 10px;
         }
         .sim-btn {
-            background: rgba(0, 230, 118, 0.2); color: #00e676; 
+            background: rgba(0, 0, 0, 0.6); 
             border: 1px solid #00e676;
-            padding: 10px 15px; border-radius: 8px; cursor: pointer; font-weight: bold;
-            backdrop-filter: blur(2px);
-            transition: all 0.2s;
+            color: #00e676;
+            padding: 8px 15px; border-radius: 8px; cursor: pointer; font-weight: bold;
+            backdrop-filter: blur(4px);
         }
-        .sim-btn:active { background: rgba(0, 230, 118, 0.5); transform: scale(0.95); }
+        .sim-btn:active { background: rgba(0, 230, 118, 0.3); }
+
+        /* 플레이어 상태창 (하단) */
+        .player-stats {
+            background: rgba(0, 0, 0, 0.7);
+            backdrop-filter: blur(10px);
+            border-radius: 16px;
+            padding: 16px;
+            width: 100%; 
+            max-width: 400px;
+            color: white;
+            border: 1px solid rgba(255, 255, 255, 0.15);
+            pointer-events: auto;
+            align-self: center; /* 중앙 정렬 */
+            margin-bottom: 20px;
+        }
+
+        .level-row { display: flex; align-items: center; justify-content: space-between; margin-bottom: 8px; }
+        .level-badge { font-size: 20px; font-weight: 800; }
+        .xp-val { font-size: 14px; opacity: 0.8; }
+        
+        /* 경험치 바 */
+        .xp-track {
+            width: 100%; height: 8px; background: rgba(255,255,255,0.2);
+            border-radius: 4px; overflow: hidden;
+        }
+        .xp-fill {
+            height: 100%; background: #00e676;
+            width: 0%;
+            transition: width 0.5s cubic-bezier(0.34, 1.56, 0.64, 1);
+            box-shadow: 0 0 10px #00e676;
+        }
     </style>
 </head>
 <body>
 
+    <div id="start-screen">
+        <h1 style="margin:0; font-size:32px;">LifeGo AR</h1>
+        <p style="opacity:0.7; margin-top:5px;">Gamify Your Daily Chores</p>
+        <button class="ar-btn-main" onclick="startAR()">START MISSION</button>
+        <p style="font-size:12px; margin-top:20px; opacity:0.5;">*HTTPS & Mobile/Headset Required</p>
+    </div>
+
     <div id="ar-ui">
         <div id="sim-controls">
-            <button class="sim-btn" onclick="triggerDetection('washing_dishes')">📸 설거지 감지 (TEST)</button>
-            <button class="sim-btn" onclick="triggerDetection('vacuuming')">🧹 청소 감지 (TEST)</button>
+            <button class="sim-btn" onclick="triggerDetection('washing_dishes')">📸 설거지 (+20 XP)</button>
+            <button class="sim-btn" onclick="triggerDetection('vacuuming')">🧹 청소 (+15 XP)</button>
         </div>
 
-        <div style="width: 100%;">
-            <div class="player-stats">
-                <div class="avatar-row">
-                    <div class="avatar"></div>
-                    <div class="level-info">
-                        <span class="level-badge">Lv. <span id="lvl-num">46</span></span>
-                        <span class="streak-badge">🔥 2 Day Streak</span>
-                    </div>
-                </div>
-                <div class="xp-bar-container">
-                    <div class="xp-fill" id="xp-bar" style="width: 45%"></div>
-                </div>
-                <div class="xp-text"><span id="xp-cur">0</span> / <span id="xp-max">100</span> XP</div>
+        <div class="player-stats">
+            <div class="level-row">
+                <span class="level-badge">LV.<span id="lvl-num">46</span></span>
+                <span class="xp-val"><span id="xp-cur">0</span> / <span id="xp-max">100</span> XP</span>
+            </div>
+            <div class="xp-track">
+                <div class="xp-fill" id="xp-bar" style="width: 0%"></div>
             </div>
         </div>
     </div>
@@ -102,145 +132,144 @@
         webxr="optionalFeatures: dom-overlay; overlayElement: #ar-ui; requiredFeatures: hit-test;"
         vr-mode-ui="enabled: false"
         ar-mode-ui="enabled: true; enterAREnabled: true;"
-        renderer="alpha: true; antialias: true; colorManagement: true;">
+        renderer="alpha: true; antialias: true;">
 
         <a-camera position="0 1.6 0" look-controls="enabled: false"></a-camera>
-
-        <a-light type="ambient" intensity="0.7"></a-light>
-        <a-light type="directional" intensity="0.8" position="-1 2 1"></a-light>
+        
+        <a-light type="ambient" intensity="0.6"></a-light>
+        <a-light type="directional" intensity="0.8" position="-0.5 1 1"></a-light>
 
         <a-entity id="floating-text-container"></a-entity>
-
     </a-scene>
 
     <script>
-        // --- [Logic] 게임 데이터 및 상태 관리 ---
+        // --- [Logic 1] 게임 데이터 (상태 관리) ---
         let currentXP = 45;
-        const maxXP = 100;
+        let maxXP = 100;
         let currentLevel = 46;
 
-        // 활동별 보상 데이터 (DB 역할)
+        // 활동 데이터베이스
         const ACTIVITY_DB = {
-            'washing_dishes': { label: 'Washing Dishes', xp: 20, color: '#4CC3D9' },
-            'vacuuming': { label: 'Vacuuming', xp: 15, color: '#EF2D5E' }
+            'washing_dishes': { label: 'Washing Dishes', xp: 20 },
+            'vacuuming': { label: 'Vacuuming', xp: 15 }
         };
 
-        // --- [Logic] 플로팅 텍스트 생성 (3D World UI) ---
+        // --- [Logic 2] AR 시작 버튼 클릭 시 ---
+        function startAR() {
+            const scene = document.querySelector('a-scene');
+            const startScreen = document.getElementById('start-screen');
+            const gameUI = document.getElementById('ar-ui');
+
+            // 1. WebXR AR 모드 진입
+            scene.enterVR();
+
+            // 2. UI 전환 (Start Screen 숨김 -> HUD 보임)
+            startScreen.style.opacity = '0';
+            setTimeout(() => {
+                startScreen.style.display = 'none';
+                gameUI.style.display = 'flex';
+                // 초기 HUD 업데이트
+                updateHUD();
+            }, 500);
+        }
+
+        // --- [Logic 3] 3D 플로팅 텍스트 생성 ---
         function spawnFloatingText(activityKey) {
             const data = ACTIVITY_DB[activityKey];
             const container = document.getElementById('floating-text-container');
             const camera = document.querySelector('a-camera');
 
-            // 1. 3D 그룹 엔티티 생성
+            // 3D 엔티티 생성
             const entity = document.createElement('a-entity');
             
-            // 위치 계산: 카메라가 바라보는 방향 앞 1.5m 지점
+            // 위치 계산: 카메라가 바라보는 방향 1.5m 앞
             const p = camera.object3D.position;
-            const direction = new THREE.Vector3(0, 0, -1.5); // 1.5미터 앞
-            direction.applyQuaternion(camera.object3D.quaternion);
+            const dir = new THREE.Vector3(0, 0, -1.5).applyQuaternion(camera.object3D.quaternion);
+            entity.setAttribute('position', {x: p.x + dir.x, y: p.y + dir.y, z: p.z + dir.z});
             
-            entity.setAttribute('position', {
-                x: p.x + direction.x, 
-                y: p.y + direction.y, 
-                z: p.z + direction.z
-            });
-
-            // ★ 핵심: 항상 카메라를 정면으로 바라보게 함 (가독성 확보)
+            // ★ 중요: 텍스트가 항상 사용자를 바라봄
             entity.setAttribute('look-at', '[camera]');
 
-            // 2. 텍스트 요소 (활동 이름)
-            const titleText = document.createElement('a-text');
-            titleText.setAttribute('value', data.label);
-            titleText.setAttribute('align', 'center');
-            titleText.setAttribute('position', '0 0.15 0');
-            titleText.setAttribute('scale', '1.5 1.5 1.5');
-            titleText.setAttribute('color', '#ffffff');
-            titleText.setAttribute('shader', 'msdf');
-            titleText.setAttribute('font', 'https://raw.githubusercontent.com/etiennepinchon/aframe-fonts/master/fonts/roboto/Roboto-Bold.json');
+            // 텍스트 (제목)
+            const text = document.createElement('a-text');
+            text.setAttribute('value', data.label);
+            text.setAttribute('align', 'center');
+            text.setAttribute('position', '0 0.15 0');
+            text.setAttribute('scale', '1.5 1.5 1.5');
+            text.setAttribute('color', 'white');
+            text.setAttribute('font', 'mozillavr');
 
-            // 3. XP 뱃지 (둥둥 뜨는 경험치)
+            // XP 뱃지 (배경 + 텍스트)
             const xpEntity = document.createElement('a-entity');
-            xpEntity.setAttribute('position', '0.9 0.15 0'); // 제목 오른쪽에 배치
-
-            const xpBg = document.createElement('a-plane');
-            xpBg.setAttribute('color', '#00e676');
-            xpBg.setAttribute('width', '0.7');
-            xpBg.setAttribute('height', '0.3');
-            xpBg.setAttribute('opacity', '0.9');
-            xpBg.setAttribute('material', 'shader: flat');
-
+            xpEntity.setAttribute('position', '0 0 -0.1'); // 제목 바로 아래나 겹쳐보이게 조정 가능
+            
+            // XP 텍스트 (녹색)
             const xpText = document.createElement('a-text');
             xpText.setAttribute('value', `+${data.xp} XP`);
+            xpText.setAttribute('color', '#00e676');
             xpText.setAttribute('align', 'center');
-            xpText.setAttribute('z-offset', '0.01'); // 배경보다 살짝 앞
-            xpText.setAttribute('scale', '1 1 1');
-            xpText.setAttribute('color', '#000'); // 밝은 배경엔 검은 글씨
-
-            xpEntity.appendChild(xpBg);
-            xpEntity.appendChild(xpText);
+            xpText.setAttribute('position', '0.8 0.15 0'); // 제목 오른쪽
+            xpText.setAttribute('scale', '1.5 1.5 1.5');
             
-            entity.appendChild(titleText);
-            entity.appendChild(xpEntity);
+            entity.appendChild(text);
+            entity.appendChild(xpText);
             container.appendChild(entity);
 
-            // 4. 애니메이션: 위로 떠오르면서 사라짐 (Floating Effect)
+            // 애니메이션: 위로 떠오르기
             entity.setAttribute('animation__pos', {
                 property: 'position',
-                to: `${entity.getAttribute('position').x} ${entity.getAttribute('position').y + 0.8} ${entity.getAttribute('position').z}`,
-                dur: 2500,
+                to: `${entity.getAttribute('position').x} ${entity.getAttribute('position').y + 0.5} ${entity.getAttribute('position').z}`,
+                dur: 2000,
                 easing: 'easeOutQuad'
             });
-            
-            // 사라지는 애니메이션 (Scale 0으로 줄어듦)
-            entity.setAttribute('animation__scale', {
-                property: 'scale',
-                to: '0 0 0',
-                delay: 2000,
-                dur: 500,
-                easing: 'easeInQuad'
-            });
 
-            // 메모리 관리를 위해 DOM에서 제거
+            // 자동 삭제
             setTimeout(() => {
                 if(entity.parentNode) entity.parentNode.removeChild(entity);
-            }, 2600);
+            }, 2000);
 
-            // 5. 실제 데이터 반영
+            // 데이터 반영
             addXP(data.xp);
         }
 
-        // --- [Logic] XP 및 레벨업 시스템 ---
+        // --- [Logic 4] 경험치 및 레벨 계산 ---
         function addXP(amount) {
             currentXP += amount;
+            
+            // 레벨업 로직
             if (currentXP >= maxXP) {
                 currentXP = currentXP - maxXP;
                 currentLevel++;
+                maxXP = Math.floor(maxXP * 1.1); // 다음 레벨 필요 경험치 증가
                 
-                // 레벨업 효과 (텍스트 색상 변경 등)
+                // 레벨업 시각적 피드백
                 const lvlNum = document.getElementById('lvl-num');
-                lvlNum.innerText = currentLevel;
-                lvlNum.style.color = '#ffeb3b';
-                setTimeout(() => lvlNum.style.color = 'white', 1000);
+                lvlNum.style.color = '#ffff00';
+                lvlNum.style.transform = 'scale(1.5)';
+                setTimeout(() => {
+                    lvlNum.style.color = 'white';
+                    lvlNum.style.transform = 'scale(1)';
+                }, 500);
             }
             updateHUD();
         }
 
         function updateHUD() {
+            document.getElementById('lvl-num').innerText = currentLevel;
             document.getElementById('xp-cur').innerText = currentXP;
             document.getElementById('xp-max').innerText = maxXP;
-            const percentage = Math.min((currentXP / maxXP) * 100, 100);
-            document.getElementById('xp-bar').style.width = `${percentage}%`;
+            
+            const pct = Math.min((currentXP / maxXP) * 100, 100);
+            document.getElementById('xp-bar').style.width = `${pct}%`;
         }
 
-        // --- [Signal] 외부 연동 포인트 ---
-        function triggerDetection(activityType) {
-            console.log(`[Vision AI] Detected: ${activityType}`);
-            spawnFloatingText(activityType);
+        // --- 외부 연동용 함수 ---
+        function triggerDetection(key) {
+            spawnFloatingText(key);
         }
-
-        // 초기 UI 렌더링
+        
+        // 초기화
         updateHUD();
-
     </script>
 </body>
 </html>
