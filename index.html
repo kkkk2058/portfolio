@@ -2,18 +2,20 @@
 <html lang="ko">
 <head>
     <meta charset="UTF-8">
-    <title>LifeGo: AR Quest Layer 1</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+    <title>LifeGo AR Quest System</title>
+    
     <script src="https://aframe.io/releases/1.6.0/aframe.min.js"></script>
     <script src="https://unpkg.com/aframe-look-at-component@0.8.0/dist/aframe-look-at-component.min.js"></script>
 
     <style>
-        /* --- HUD (Head-Up Display) 스타일 --- */
+        /* --- 2D HUD 스타일 (기존 디자인 유지) --- */
         body { margin: 0; overflow: hidden; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; }
         
         #ar-ui {
             position: absolute;
             top: 0; left: 0; width: 100%; height: 100%;
-            pointer-events: none;
+            pointer-events: none; /* UI 배경은 클릭 통과 (3D 씬 조작 가능) */
             z-index: 100;
             display: flex;
             flex-direction: column;
@@ -24,44 +26,37 @@
 
         /* 플레이어 상태창 (좌측 하단) */
         .player-stats {
-            background: rgba(0, 0, 0, 0.5);
+            background: rgba(0, 0, 0, 0.6); /* 반투명 검정 배경 */
             backdrop-filter: blur(5px);
             border-radius: 15px;
             padding: 15px;
-            width: 250px;
+            width: 280px;
             color: white;
             border: 1px solid rgba(255, 255, 255, 0.2);
-            pointer-events: auto; /* 터치 가능하게 */
+            pointer-events: auto; /* 버튼 등은 클릭 가능해야 함 */
+            margin-bottom: 20px; /* AR 버튼과 겹치지 않게 */
         }
 
-        .avatar-row { display: flex; align-items: center; gap: 10px; margin-bottom: 5px; }
-        .avatar { width: 40px; height: 40px; border-radius: 50%; background: #ddd; border: 2px solid #fff; }
-        .level-badge { font-size: 18px; font-weight: bold; color: #fff; text-shadow: 0 0 5px rgba(0,0,0,0.5); }
-        .fire-icon { color: #ff9500; margin-left: 5px; }
+        .avatar-row { display: flex; align-items: center; gap: 10px; margin-bottom: 8px; }
+        .avatar { width: 45px; height: 45px; border-radius: 50%; background: #ddd url('https://cdn-icons-png.flaticon.com/512/4140/4140048.png') center/cover; border: 2px solid #fff; }
+        .level-info { display: flex; flex-direction: column; }
+        .level-badge { font-size: 20px; font-weight: bold; color: #fff; text-shadow: 0 0 5px rgba(0,0,0,0.5); }
+        .streak-badge { font-size: 14px; color: #ff9500; font-weight: bold; }
 
+        /* 경험치 바 */
         .xp-bar-container {
-            width: 100%; height: 10px; background: rgba(255,255,255,0.3);
+            width: 100%; height: 10px; background: rgba(255,255,255,0.2);
             border-radius: 5px; overflow: hidden; margin-top: 5px;
         }
         .xp-fill {
-            height: 100%; background: #00e676; width: 45%;
+            height: 100%; background: linear-gradient(90deg, #00e676, #00c853);
+            width: 0%; /* JS로 제어 */
             box-shadow: 0 0 10px #00e676;
-            transition: width 0.3s ease;
+            transition: width 0.5s cubic-bezier(0.4, 0, 0.2, 1);
         }
-        .xp-text { font-size: 12px; margin-top: 2px; text-align: right; opacity: 0.8; }
+        .xp-text { font-size: 12px; margin-top: 4px; text-align: right; opacity: 0.9; font-weight: bold; }
 
-        /* 트로피 아이콘 (업적) */
-        .trophy-btn {
-            width: 40px; height: 40px;
-            background: rgba(255,255,255,0.2);
-            border-radius: 50%;
-            display: flex; align-items: center; justify-content: center;
-            font-size: 20px;
-            margin-left: 10px;
-            border: 1px solid rgba(255,255,255,0.3);
-        }
-
-        /* 시뮬레이션용 버튼 (실제 연동 시 Vision AI가 대체) */
+        /* 시뮬레이션 버튼 (테스트용) */
         #sim-controls {
             position: absolute;
             top: 20px; right: 20px;
@@ -69,31 +64,34 @@
             display: flex; flex-direction: column; gap: 10px;
         }
         .sim-btn {
-            background: rgba(0, 0, 0, 0.7); color: #00e676; border: 1px solid #00e676;
-            padding: 8px 12px; border-radius: 5px; cursor: pointer; font-weight: bold;
+            background: rgba(0, 230, 118, 0.2); color: #00e676; 
+            border: 1px solid #00e676;
+            padding: 10px 15px; border-radius: 8px; cursor: pointer; font-weight: bold;
+            backdrop-filter: blur(2px);
+            transition: all 0.2s;
         }
+        .sim-btn:active { background: rgba(0, 230, 118, 0.5); transform: scale(0.95); }
     </style>
 </head>
 <body>
 
     <div id="ar-ui">
         <div id="sim-controls">
-            <button class="sim-btn" onclick="triggerDetection('washing_dishes')">📸 [TEST] 설거지 감지</button>
-            <button class="sim-btn" onclick="triggerDetection('vacuuming')">📸 [TEST] 청소기 감지</button>
+            <button class="sim-btn" onclick="triggerDetection('washing_dishes')">📸 설거지 감지 (TEST)</button>
+            <button class="sim-btn" onclick="triggerDetection('vacuuming')">🧹 청소 감지 (TEST)</button>
         </div>
 
-        <div style="display: flex; align-items: flex-end;">
+        <div style="width: 100%;">
             <div class="player-stats">
                 <div class="avatar-row">
-                    <div class="avatar" style="background: url('https://cdn-icons-png.flaticon.com/512/4140/4140048.png') center/cover;"></div>
-                    <div>
-                        <span class="level-badge">Level <span id="lvl-num">46</span></span>
-                        <span class="fire-icon">🔥 2</span>
+                    <div class="avatar"></div>
+                    <div class="level-info">
+                        <span class="level-badge">Lv. <span id="lvl-num">46</span></span>
+                        <span class="streak-badge">🔥 2 Day Streak</span>
                     </div>
-                    <div class="trophy-btn">🏆</div>
                 </div>
                 <div class="xp-bar-container">
-                    <div class="xp-fill" id="xp-bar" style="width: 0%"></div>
+                    <div class="xp-fill" id="xp-bar" style="width: 45%"></div>
                 </div>
                 <div class="xp-text"><span id="xp-cur">0</span> / <span id="xp-max">100</span> XP</div>
             </div>
@@ -101,93 +99,82 @@
     </div>
 
     <a-scene 
-        webxr="optionalFeatures: dom-overlay; overlayElement: #ar-ui"
-        vr-mode-ui="enabled: true"
-        ar-mode-ui="enabled: true"
-        renderer="antialias: true; colorManagement: true;">
+        webxr="optionalFeatures: dom-overlay; overlayElement: #ar-ui; requiredFeatures: hit-test;"
+        vr-mode-ui="enabled: false"
+        ar-mode-ui="enabled: true; enterAREnabled: true;"
+        renderer="alpha: true; antialias: true; colorManagement: true;">
 
-        <a-assets>
-            <img id="icon-check" src="https://cdn-icons-png.flaticon.com/512/190/190411.png">
-        </a-assets>
+        <a-camera position="0 1.6 0" look-controls="enabled: false"></a-camera>
 
-        <a-camera position="0 1.6 0" look-controls="enabled: false">
-            <a-entity cursor="fuse: false; rayOrigin: mouse;" raycaster="objects: .clickable"></a-entity>
-        </a-camera>
-
-        <a-light type="ambient" intensity="1"></a-light>
-        <a-light type="directional" intensity="0.5" position="-1 2 1"></a-light>
+        <a-light type="ambient" intensity="0.7"></a-light>
+        <a-light type="directional" intensity="0.8" position="-1 2 1"></a-light>
 
         <a-entity id="floating-text-container"></a-entity>
 
     </a-scene>
 
     <script>
-        // --- 상태 관리 ---
+        // --- [Logic] 게임 데이터 및 상태 관리 ---
         let currentXP = 45;
         const maxXP = 100;
         let currentLevel = 46;
 
-        // --- 설정: 활동별 보상 데이터 ---
+        // 활동별 보상 데이터 (DB 역할)
         const ACTIVITY_DB = {
-            'washing_dishes': { label: 'Washing Dishes', xp: 4, color: '#4CC3D9' }, // 설거지
-            'vacuuming': { label: 'Vacuuming', xp: 2, color: '#EF2D5E' }            // 청소
+            'washing_dishes': { label: 'Washing Dishes', xp: 20, color: '#4CC3D9' },
+            'vacuuming': { label: 'Vacuuming', xp: 15, color: '#EF2D5E' }
         };
 
-        // --- 핵심 기능 1: 플로팅 텍스트 생성 (3D UI) ---
-        // 화면 중앙(혹은 AI가 감지한 좌표)에 텍스트와 XP를 띄웁니다.
-        function spawnFloatingText(activityKey, position) {
+        // --- [Logic] 플로팅 텍스트 생성 (3D World UI) ---
+        function spawnFloatingText(activityKey) {
             const data = ACTIVITY_DB[activityKey];
             const container = document.getElementById('floating-text-container');
-            
-            // 1. 그룹 엔티티 생성 (텍스트 + 배경 등)
+            const camera = document.querySelector('a-camera');
+
+            // 1. 3D 그룹 엔티티 생성
             const entity = document.createElement('a-entity');
             
-            // 위치 설정 (카메라 앞 1.5m 지점 혹은 지정 좌표)
-            if (!position) {
-                const camera = document.querySelector('a-camera');
-                const p = camera.object3D.position;
-                // 카메라가 보고 있는 방향 벡터 계산 (간단히 앞 2m)
-                const direction = new THREE.Vector3(0, 0, -2); 
-                direction.applyQuaternion(camera.object3D.quaternion);
-                entity.setAttribute('position', {
-                    x: p.x + direction.x, 
-                    y: p.y + direction.y, 
-                    z: p.z + direction.z
-                });
-            } else {
-                entity.setAttribute('position', position);
-            }
+            // 위치 계산: 카메라가 바라보는 방향 앞 1.5m 지점
+            const p = camera.object3D.position;
+            const direction = new THREE.Vector3(0, 0, -1.5); // 1.5미터 앞
+            direction.applyQuaternion(camera.object3D.quaternion);
+            
+            entity.setAttribute('position', {
+                x: p.x + direction.x, 
+                y: p.y + direction.y, 
+                z: p.z + direction.z
+            });
 
-            // 빌보딩 (항상 카메라 보기)
+            // ★ 핵심: 항상 카메라를 정면으로 바라보게 함 (가독성 확보)
             entity.setAttribute('look-at', '[camera]');
 
             // 2. 텍스트 요소 (활동 이름)
             const titleText = document.createElement('a-text');
             titleText.setAttribute('value', data.label);
             titleText.setAttribute('align', 'center');
-            titleText.setAttribute('position', '0 0.1 0');
-            titleText.setAttribute('scale', '1.2 1.2 1.2');
-            titleText.setAttribute('font', 'mozillavr');
+            titleText.setAttribute('position', '0 0.15 0');
+            titleText.setAttribute('scale', '1.5 1.5 1.5');
             titleText.setAttribute('color', '#ffffff');
             titleText.setAttribute('shader', 'msdf');
-            
-            // 3. XP 뱃지 (녹색 배경 + 텍스트)
+            titleText.setAttribute('font', 'https://raw.githubusercontent.com/etiennepinchon/aframe-fonts/master/fonts/roboto/Roboto-Bold.json');
+
+            // 3. XP 뱃지 (둥둥 뜨는 경험치)
             const xpEntity = document.createElement('a-entity');
-            xpEntity.setAttribute('position', '0.8 0.15 0'); // 제목 옆에 배치
-            
+            xpEntity.setAttribute('position', '0.9 0.15 0'); // 제목 오른쪽에 배치
+
             const xpBg = document.createElement('a-plane');
             xpBg.setAttribute('color', '#00e676');
-            xpBg.setAttribute('width', '0.6');
-            xpBg.setAttribute('height', '0.25');
+            xpBg.setAttribute('width', '0.7');
+            xpBg.setAttribute('height', '0.3');
             xpBg.setAttribute('opacity', '0.9');
             xpBg.setAttribute('material', 'shader: flat');
-            xpBg.setAttribute('class', 'clickable'); // 클릭해서 수령 가능하게?
 
             const xpText = document.createElement('a-text');
             xpText.setAttribute('value', `+${data.xp} XP`);
             xpText.setAttribute('align', 'center');
             xpText.setAttribute('z-offset', '0.01'); // 배경보다 살짝 앞
-            xpText.setAttribute('scale', '0.8 0.8 0.8');
+            xpText.setAttribute('scale', '1 1 1');
+            xpText.setAttribute('color', '#000'); // 밝은 배경엔 검은 글씨
 
             xpEntity.appendChild(xpBg);
             xpEntity.appendChild(xpText);
@@ -196,31 +183,44 @@
             entity.appendChild(xpEntity);
             container.appendChild(entity);
 
-            // 4. 애니메이션 (위로 떠오르면서 사라짐)
+            // 4. 애니메이션: 위로 떠오르면서 사라짐 (Floating Effect)
             entity.setAttribute('animation__pos', {
                 property: 'position',
-                to: `${entity.getAttribute('position').x} ${entity.getAttribute('position').y + 0.5} ${entity.getAttribute('position').z}`,
-                dur: 2000,
+                to: `${entity.getAttribute('position').x} ${entity.getAttribute('position').y + 0.8} ${entity.getAttribute('position').z}`,
+                dur: 2500,
                 easing: 'easeOutQuad'
             });
             
-            // 투명도 애니메이션 (자식들에게 전파가 안되므로 간단히 타임아웃으로 제거)
+            // 사라지는 애니메이션 (Scale 0으로 줄어듦)
+            entity.setAttribute('animation__scale', {
+                property: 'scale',
+                to: '0 0 0',
+                delay: 2000,
+                dur: 500,
+                easing: 'easeInQuad'
+            });
+
+            // 메모리 관리를 위해 DOM에서 제거
             setTimeout(() => {
                 if(entity.parentNode) entity.parentNode.removeChild(entity);
-            }, 2000);
+            }, 2600);
 
-            // 5. XP 업데이트
+            // 5. 실제 데이터 반영
             addXP(data.xp);
         }
 
-        // --- 핵심 기능 2: XP 및 레벨 로직 ---
+        // --- [Logic] XP 및 레벨업 시스템 ---
         function addXP(amount) {
             currentXP += amount;
             if (currentXP >= maxXP) {
                 currentXP = currentXP - maxXP;
                 currentLevel++;
-                document.getElementById('lvl-num').innerText = currentLevel;
-                // 레벨업 효과 추가 가능
+                
+                // 레벨업 효과 (텍스트 색상 변경 등)
+                const lvlNum = document.getElementById('lvl-num');
+                lvlNum.innerText = currentLevel;
+                lvlNum.style.color = '#ffeb3b';
+                setTimeout(() => lvlNum.style.color = 'white', 1000);
             }
             updateHUD();
         }
@@ -228,17 +228,17 @@
         function updateHUD() {
             document.getElementById('xp-cur').innerText = currentXP;
             document.getElementById('xp-max').innerText = maxXP;
-            document.getElementById('xp-bar').style.width = `${(currentXP / maxXP) * 100}%`;
+            const percentage = Math.min((currentXP / maxXP) * 100, 100);
+            document.getElementById('xp-bar').style.width = `${percentage}%`;
         }
 
-        // --- 연동 포인트: 외부 신호 수신 ---
-        // 실제로는 WebSocket이나 서버에서 '설거지 감지됨' 신호를 받으면 이 함수가 실행됩니다.
+        // --- [Signal] 외부 연동 포인트 ---
         function triggerDetection(activityType) {
-            console.log(`[Vision AI] Activity Detected: ${activityType}`);
+            console.log(`[Vision AI] Detected: ${activityType}`);
             spawnFloatingText(activityType);
         }
 
-        // 초기화
+        // 초기 UI 렌더링
         updateHUD();
 
     </script>
