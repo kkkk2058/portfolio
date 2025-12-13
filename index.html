@@ -1,200 +1,175 @@
-
 <!DOCTYPE html>
 <html lang="ko">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
-    <title>LifeGo AR: Ultimate HUD</title>
+    <title>LifeGo AR: v3.0 Ultimate</title>
     
     <script src="https://aframe.io/releases/1.6.0/aframe.min.js"></script>
     <script src="https://unpkg.com/aframe-look-at-component@0.8.0/dist/aframe-look-at-component.min.js"></script>
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
 
     <style>
-        body { margin: 0; overflow: hidden; background: #000; font-family: 'Segoe UI', sans-serif; }
-
-        /* [1] 배경 카메라 */
+        /* --- 기본 설정 --- */
+        body { margin: 0; overflow: hidden; background: #000; font-family: 'Segoe UI', sans-serif; user-select: none; }
+        
+        /* 카메라 배경 */
         #camera-feed {
             position: absolute; top: 0; left: 0; width: 100%; height: 100%;
-            object-fit: cover; z-index: 1; transform: scaleX(-1); /* 셀카모드면 반전 필요 */
+            object-fit: cover; z-index: 1; transform: scaleX(-1);
         }
 
-        /* [2] UI 레이어 (전체 컨테이너) */
+        /* UI 레이어 */
         #ui-layer {
             position: absolute; top: 0; left: 0; width: 100%; height: 100%;
             z-index: 10; pointer-events: none;
             display: flex; flex-direction: column; justify-content: space-between;
-            padding: 20px; box-sizing: border-box;
+            padding: 15px; box-sizing: border-box;
         }
 
-        /* --- 상단 프로필 & 스트릭 (좌측 상단) --- */
+        /* --- [UPGRADE] 상점 (Shop) 모달 --- */
+        #shop-modal {
+            display: none; position: absolute; top: 50%; left: 50%;
+            transform: translate(-50%, -50%); width: 85%; max-width: 400px;
+            background: rgba(10, 20, 30, 0.95); border: 1px solid #00E676;
+            border-radius: 15px; padding: 20px; z-index: 999; pointer-events: auto;
+            box-shadow: 0 0 30px rgba(0,230,118,0.3); color: white;
+        }
+        .shop-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px; border-bottom: 1px solid #333; padding-bottom: 10px; }
+        .shop-items { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+        .shop-item {
+            background: rgba(255,255,255,0.05); border-radius: 10px; padding: 10px;
+            text-align: center; border: 1px solid transparent; transition: 0.2s; cursor: pointer;
+        }
+        .shop-item:hover { border-color: #00E676; background: rgba(0,230,118,0.1); }
+        .item-icon { font-size: 30px; margin-bottom: 5px; display: block; }
+        .item-price { color: #FFD700; font-weight: bold; font-size: 14px; }
+        .close-btn { background: none; border: none; color: #aaa; font-size: 20px; cursor: pointer; }
+
+        /* --- UI Components --- */
         .profile-panel {
-            pointer-events: auto;
-            background: rgba(0, 20, 40, 0.6);
-            backdrop-filter: blur(12px);
-            border: 1px solid rgba(0, 255, 255, 0.3);
-            border-left: 4px solid #00E676;
-            padding: 10px 20px;
-            border-radius: 0 20px 20px 0;
-            color: white;
-            display: inline-flex; align-items: center; gap: 15px;
+            pointer-events: auto; background: rgba(0, 20, 40, 0.7); backdrop-filter: blur(10px);
+            border-left: 4px solid #00E676; padding: 10px 15px; border-radius: 0 15px 15px 0;
+            color: white; display: inline-flex; align-items: center; gap: 12px;
             box-shadow: 0 5px 15px rgba(0,0,0,0.3);
-            align-self: flex-start;
         }
-        .user-avatar {
-            width: 40px; height: 40px; border-radius: 50%;
-            background: url('https://cdn-icons-png.flaticon.com/512/4140/4140048.png') center/cover;
-            border: 2px solid white;
-        }
-        .user-info div:first-child { font-weight: bold; font-size: 14px; color: #00E676; }
-        .user-info div:last-child { font-size: 18px; font-weight: 800; letter-spacing: 1px; }
-
-        .streak-badge {
-            background: rgba(255, 100, 0, 0.2); border: 1px solid #FF6D00;
-            color: #FF6D00; padding: 5px 10px; border-radius: 10px;
-            font-size: 14px; font-weight: bold; display: flex; align-items: center; gap: 5px;
-        }
-
-        /* --- 퀘스트 목록 (우측 상단) --- */
-        .quest-panel {
-            pointer-events: auto;
-            margin-top: 10px;
-            align-self: flex-end;
-            width: 250px;
-        }
-        .quest-header {
-            background: rgba(0, 0, 0, 0.7); color: #00E676;
-            padding: 8px 15px; font-weight: bold; font-size: 14px;
-            border-radius: 10px 10px 0 0; border: 1px solid rgba(0, 255, 255, 0.2);
-            border-bottom: none; display: flex; justify-content: space-between;
-        }
-        .quest-list {
-            background: rgba(0, 20, 40, 0.6); backdrop-filter: blur(10px);
-            border: 1px solid rgba(0, 255, 255, 0.2);
-            border-radius: 0 0 10px 10px; padding: 10px;
-        }
-        .quest-item {
-            display: flex; align-items: center; justify-content: space-between;
-            margin-bottom: 8px; font-size: 13px; color: white;
-            padding: 8px; border-radius: 5px; background: rgba(255,255,255,0.05);
-            transition: all 0.3s;
-        }
-        .quest-item.completed { opacity: 0.5; text-decoration: line-through; background: rgba(0,255,100,0.1); }
-        .quest-reward { color: #FFD700; font-size: 11px; font-weight: bold; }
-
-        /* --- 하단 상태창 & 컨트롤 (하단) --- */
-        .bottom-hud {
-            width: 100%; display: flex; flex-direction: column; gap: 10px;
-        }
-
-        /* 테스트 버튼들 */
-        .sim-actions {
-            pointer-events: auto; display: flex; gap: 10px; justify-content: center;
-        }
-        .btn-action {
-            background: rgba(0, 0, 0, 0.5); border: 1px solid rgba(255,255,255,0.3);
-            color: white; padding: 8px 16px; border-radius: 20px; cursor: pointer;
-            display: flex; align-items: center; gap: 5px; font-size: 13px;
-            transition: 0.2s; backdrop-filter: blur(5px);
-        }
-        .btn-action:hover { background: rgba(0, 230, 118, 0.2); border-color: #00E676; }
-
-        /* 메인 스탯 바 */
-        .status-bar {
-            pointer-events: auto;
-            background: rgba(10, 10, 10, 0.85); backdrop-filter: blur(15px);
-            border-radius: 20px; padding: 15px 25px;
-            border: 1px solid rgba(255,255,255,0.15);
-            box-shadow: 0 0 20px rgba(0,230,118,0.1);
-            display: flex; flex-direction: column; gap: 5px;
-        }
-
-        .stat-row { display: flex; justify-content: space-between; align-items: flex-end; }
-        .level-display { font-size: 32px; font-weight: 900; line-height: 1; color: white; text-shadow: 0 0 10px rgba(0,230,118,0.5); }
-        .level-label { font-size: 12px; color: #aaa; margin-left: 5px; font-weight: normal; }
+        .user-avatar { width: 40px; height: 40px; border-radius: 50%; background: #333 url('https://cdn-icons-png.flaticon.com/512/4140/4140048.png') center/cover; border: 2px solid white; }
         
-        .coin-display { color: #FFD700; font-weight: bold; font-size: 18px; display: flex; align-items: center; gap: 5px; }
+        /* 퀘스트 패널 */
+        .quest-panel { pointer-events: auto; margin-top: 10px; align-self: flex-end; width: 220px; }
+        .quest-list { background: rgba(0,0,0,0.6); backdrop-filter: blur(5px); padding: 10px; border-radius: 10px; color: white; border: 1px solid rgba(255,255,255,0.1); }
+        .quest-item { display: flex; justify-content: space-between; margin-bottom: 8px; font-size: 13px; align-items: center; }
+        .quest-check { color: #00E676; margin-right: 5px; }
+        .quest-item.done { text-decoration: line-through; opacity: 0.5; color: #aaa; }
 
-        .xp-container {
-            width: 100%; height: 12px; background: rgba(255,255,255,0.1);
-            border-radius: 6px; overflow: hidden; position: relative; margin-top: 5px;
+        /* 하단 컨트롤 */
+        .bottom-hud { width: 100%; display: flex; flex-direction: column; gap: 10px; }
+        
+        .action-row { pointer-events: auto; display: flex; justify-content: center; gap: 10px; }
+        .btn-act {
+            background: rgba(0,0,0,0.6); color: white; border: 1px solid #555;
+            padding: 8px 15px; border-radius: 20px; font-size: 13px; cursor: pointer;
+            display: flex; align-items: center; gap: 5px; backdrop-filter: blur(4px);
         }
-        .xp-fill {
-            height: 100%; background: linear-gradient(90deg, #00E676, #00B0FF);
-            width: 0%; transition: width 0.6s cubic-bezier(0.22, 1, 0.36, 1);
-            box-shadow: 0 0 15px #00E676;
+        .btn-act:active { transform: scale(0.95); background: rgba(0,230,118,0.3); }
+
+        .btn-shop { background: linear-gradient(135deg, #FFD700, #FFA000); color: black; border: none; font-weight: bold; }
+
+        /* 스탯 바 */
+        .status-bar {
+            pointer-events: auto; background: rgba(10, 10, 10, 0.85); backdrop-filter: blur(15px);
+            border-radius: 15px; padding: 15px 20px; border: 1px solid rgba(255,255,255,0.1);
         }
-        .xp-text { font-size: 11px; color: #bbb; text-align: right; margin-top: 2px; }
+        .stat-top { display: flex; justify-content: space-between; align-items: flex-end; }
+        .lvl { font-size: 28px; font-weight: 900; color: white; line-height: 1; }
+        .coin { color: #FFD700; font-weight: bold; font-size: 16px; }
+        
+        .xp-track { width: 100%; height: 10px; background: #333; border-radius: 5px; margin-top: 8px; overflow: hidden; }
+        .xp-fill { height: 100%; background: #00E676; width: 0%; transition: width 0.5s cubic-bezier(0.34, 1.56, 0.64, 1); box-shadow: 0 0 10px #00E676; }
 
         /* 시작 화면 */
-        #start-overlay {
-            position: absolute; top:0; left:0; width:100%; height:100%;
-            background: #050505; z-index: 9999;
-            display: flex; flex-direction: column; align-items: center; justify-content: center;
-            color: white;
-        }
-        .btn-start {
-            background: #00E676; border: none; padding: 18px 50px; border-radius: 50px;
-            font-size: 22px; font-weight: bold; color: #000; margin-top: 30px; cursor: pointer;
-            box-shadow: 0 0 30px rgba(0,230,118,0.4); text-transform: uppercase;
-        }
+        #start-overlay { position: absolute; top:0; left:0; width:100%; height:100%; background: #080808; z-index: 9999; display: flex; flex-direction: column; align-items: center; justify-content: center; color: white; }
+        .btn-main { background: #00E676; border: none; padding: 18px 50px; border-radius: 50px; font-size: 20px; font-weight: bold; margin-top: 30px; cursor: pointer; box-shadow: 0 0 20px rgba(0,230,118,0.4); }
     </style>
 </head>
 <body>
 
+    <audio id="sfx-coin" src="https://assets.mixkit.co/sfx/preview/mixkit-winning-chimes-2015.mp3"></audio>
+    <audio id="sfx-level" src="https://assets.mixkit.co/sfx/preview/mixkit-arcade-game-jump-coin-216.mp3"></audio>
+    <audio id="sfx-click" src="https://assets.mixkit.co/sfx/preview/mixkit-modern-technology-select-3124.mp3"></audio>
+
     <video id="camera-feed" autoplay playsinline muted></video>
 
     <div id="start-overlay">
-        <h1 style="font-size: 40px; margin: 0; color: #00E676; text-shadow: 0 0 20px rgba(0,230,118,0.5);">LIFEGO</h1>
-        <p style="letter-spacing: 5px; font-size: 14px; color: #aaa;">AUGMENTED REALITY SYSTEM</p>
-        <button class="btn-start" onclick="initSystem()">SYSTEM START</button>
+        <h1 style="color:#00E676; font-size:40px; margin:0;">LIFEGO v3.0</h1>
+        <p style="color:#aaa;">Gamification of Reality</p>
+        <button class="btn-main" onclick="initApp()">SYSTEM START</button>
+        <p id="save-msg" style="color:#FFD700; font-size:12px; margin-top:20px; display:none;">💾 데이터 로드됨</p>
+    </div>
+
+    <div id="shop-modal">
+        <div class="shop-header">
+            <span><i class="fas fa-shopping-cart"></i> REWARD SHOP</span>
+            <button class="close-btn" onclick="toggleShop()"><i class="fas fa-times"></i></button>
+        </div>
+        <div style="text-align:right; margin-bottom:10px; color:#FFD700; font-weight:bold;">
+            보유: <span id="shop-coin">0</span> G
+        </div>
+        <div class="shop-items">
+            <div class="shop-item" onclick="buyItem('coffee', 500)">
+                <span class="item-icon">☕</span>
+                <div>커피 한 잔</div>
+                <div class="item-price">500 G</div>
+            </div>
+            <div class="shop-item" onclick="buyItem('rest', 1000)">
+                <span class="item-icon">🎮</span>
+                <div>30분 휴식권</div>
+                <div class="item-price">1,000 G</div>
+            </div>
+            <div class="shop-item" onclick="buyItem('snack', 300)">
+                <span class="item-icon">🍩</span>
+                <div>간식 타임</div>
+                <div class="item-price">300 G</div>
+            </div>
+            <div class="shop-item" onclick="buyItem('theme', 5000)">
+                <span class="item-icon">🎨</span>
+                <div>골드 테마</div>
+                <div class="item-price">5,000 G</div>
+            </div>
+        </div>
     </div>
 
     <div id="ui-layer" style="display:none;">
-        
-        <div style="width: 100%; display: flex; justify-content: space-between;">
+        <div style="display:flex; justify-content:space-between; width:100%;">
             <div class="profile-panel">
                 <div class="user-avatar"></div>
-                <div class="user-info">
-                    <div>PLAYER</div>
-                    <div>SEHOON KIM</div>
-                </div>
-                <div class="streak-badge">
-                    <i class="fas fa-fire"></i> 3 Day
+                <div>
+                    <div style="font-size:11px; color:#00E676;">PLAYER</div>
+                    <div style="font-weight:bold;">SEHOON KIM</div>
                 </div>
             </div>
-
             <div class="quest-panel">
-                <div class="quest-header">
-                    <span><i class="fas fa-list-ul"></i> ACTIVE QUESTS</span>
-                    <span id="quest-count">0/3</span>
-                </div>
-                <div class="quest-list" id="quest-container">
-                    </div>
+                <div style="font-weight:bold; margin-bottom:5px; color:#00E676;">📋 QUESTS</div>
+                <div class="quest-list" id="quest-list-ui"></div>
             </div>
         </div>
 
         <div class="bottom-hud">
-            <div class="sim-actions">
-                <button class="btn-action" onclick="triggerEvent('water')"><i class="fas fa-glass-water"></i> 물 마시기</button>
-                <button class="btn-action" onclick="triggerEvent('clean')"><i class="fas fa-broom"></i> 청소하기</button>
-                <button class="btn-action" onclick="triggerEvent('read')"><i class="fas fa-book"></i> 독서하기</button>
+            <div class="action-row">
+                <button class="btn-act" onclick="completeAction('clean')"><i class="fas fa-broom"></i> 청소</button>
+                <button class="btn-act" onclick="completeAction('dish')"><i class="fas fa-soap"></i> 설거지</button>
+                <button class="btn-act btn-shop" onclick="toggleShop()"><i class="fas fa-store"></i> 상점</button>
             </div>
 
             <div class="status-bar">
-                <div class="stat-row">
-                    <div>
-                        <span class="level-display" id="lvl-num">46</span>
-                        <span class="level-label">LEVEL</span>
-                    </div>
-                    <div class="coin-display">
-                        <i class="fas fa-coins"></i> <span id="coin-num">1,250</span> G
-                    </div>
+                <div class="stat-top">
+                    <div><span class="lvl">LV.<span id="ui-lvl">1</span></span></div>
+                    <div class="coin"><i class="fas fa-coins"></i> <span id="ui-coin">0</span></div>
                 </div>
-                <div class="xp-container">
-                    <div class="xp-fill" id="xp-bar"></div>
+                <div class="xp-track"><div class="xp-fill" id="ui-bar"></div></div>
+                <div style="text-align:right; font-size:11px; color:#aaa; margin-top:3px;">
+                    XP <span id="ui-cur">0</span> / <span id="ui-max">100</span>
                 </div>
-                <div class="xp-text"><span id="xp-cur">0</span> / <span id="xp-max">100</span> XP</div>
             </div>
         </div>
     </div>
@@ -209,115 +184,133 @@
     </div>
 
     <script>
-        // --- 데이터 상태 관리 ---
-        const gameState = {
-            level: 46,
-            xp: 45,
+        // --- [UPGRADE] 사운드 매니저 ---
+        const SFX = {
+            coin: document.getElementById('sfx-coin'),
+            level: document.getElementById('sfx-level'),
+            click: document.getElementById('sfx-click'),
+            play: (name) => {
+                const sound = SFX[name];
+                if(sound) { sound.currentTime = 0; sound.play().catch(e=>{}); }
+            }
+        };
+
+        // --- 게임 데이터 ---
+        let game = {
+            level: 1,
+            xp: 0,
             maxXp: 100,
-            coins: 1250,
+            coins: 0,
             quests: [
-                { id: 'water', title: '수분 보충하기', xp: 10, gold: 50, completed: false },
-                { id: 'clean', title: '방 청소하기', xp: 50, gold: 200, completed: false },
-                { id: 'read', title: '전공 서적 읽기', xp: 30, gold: 100, completed: false }
+                { id: 'clean', title: '방 청소하기', xp: 50, gold: 100, done: false },
+                { id: 'dish', title: '설거지 하기', xp: 30, gold: 50, done: false }
             ]
         };
 
+        // --- [UPGRADE] 데이터 저장/로드 (LocalStorage) ---
+        function loadData() {
+            const saved = localStorage.getItem('lifego_save_v1');
+            if (saved) {
+                game = JSON.parse(saved);
+                document.getElementById('save-msg').style.display = 'block';
+            }
+        }
+        function saveData() {
+            localStorage.setItem('lifego_save_v1', JSON.stringify(game));
+        }
+
         // --- 초기화 ---
-        async function initSystem() {
+        async function initApp() {
+            SFX.play('click');
+            loadData(); // 데이터 로드
             try {
-                // 카메라 권한 요청
-                const stream = await navigator.mediaDevices.getUserMedia({ 
-                    video: { facingMode: "environment" } 
-                });
+                const stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: "environment" } });
                 document.getElementById('camera-feed').srcObject = stream;
                 
-                // UI 전환
                 document.getElementById('start-overlay').style.display = 'none';
                 document.getElementById('ui-layer').style.display = 'flex';
-                
-                renderQuests();
-                updateStats();
+                updateUI();
             } catch (e) {
-                alert("카메라 권한이 필요합니다! " + e.message);
+                alert("카메라 권한 필수: " + e.message);
             }
         }
 
-        // --- 퀘스트 렌더링 ---
-        function renderQuests() {
-            const container = document.getElementById('quest-container');
-            container.innerHTML = '';
-            let completeCount = 0;
+        // --- 액션 수행 ---
+        function completeAction(type) {
+            const quest = game.quests.find(q => q.id === type);
+            if(!quest) return;
 
-            gameState.quests.forEach(q => {
-                if(q.completed) completeCount++;
-                const item = document.createElement('div');
-                item.className = `quest-item ${q.completed ? 'completed' : ''}`;
-                item.innerHTML = `
-                    <div>
-                        <i class="fas ${q.completed ? 'fa-check-circle' : 'fa-circle'}"></i> 
-                        ${q.title}
-                    </div>
-                    <div class="quest-reward">+${q.gold}G</div>
-                `;
-                container.appendChild(item);
-            });
-            document.getElementById('quest-count').innerText = `${completeCount}/${gameState.quests.length}`;
-        }
+            // 1. 효과음
+            SFX.play('coin');
 
-        // --- 이벤트 발생 (AI 감지 시뮬레이션) ---
-        function triggerEvent(type) {
-            // 1. 퀘스트 찾기
-            const quest = gameState.quests.find(q => q.id === type);
-            if (!quest) return;
+            // 2. 3D 효과 (파티클 느낌 추가)
+            spawn3DEffect(quest.title, quest.xp, quest.gold);
 
-            // 2. 3D 텍스트 띄우기
-            spawn3DText(quest.title, quest.xp, quest.gold);
-
-            // 3. 보상 지급 (중복 완료 가능하게 하거나, 1회성으로 하거나 선택 가능)
-            // 여기선 반복 수행 가능하게 설정하되, 퀘스트 UI 상에선 완료 표시
-            if (!quest.completed) {
-                quest.completed = true;
-                renderQuests();
-            }
-
-            // 4. 스탯 업데이트
-            addReward(quest.xp, quest.gold);
-        }
-
-        // --- 보상 로직 ---
-        function addReward(xp, gold) {
-            gameState.xp += xp;
-            gameState.coins += gold;
-
-            // 레벨업 체크
-            if (gameState.xp >= gameState.maxXp) {
-                gameState.xp -= gameState.maxXp;
-                gameState.level++;
-                gameState.maxXp = Math.floor(gameState.maxXp * 1.1);
-                showLevelUpEffect();
-            }
-            updateStats();
-        }
-
-        function updateStats() {
-            document.getElementById('lvl-num').innerText = gameState.level;
-            document.getElementById('coin-num').innerText = gameState.coins.toLocaleString();
-            document.getElementById('xp-cur').innerText = gameState.xp;
-            document.getElementById('xp-max').innerText = gameState.maxXp;
+            // 3. 보상
+            game.xp += quest.xp;
+            game.coins += quest.gold;
+            quest.done = true; // 퀘스트 완료 처리 (단순화를 위해 반복 가능하게 하려면 false 유지)
             
-            const pct = Math.min((gameState.xp / gameState.maxXp) * 100, 100);
-            document.getElementById('xp-bar').style.width = `${pct}%`;
+            checkLevelUp();
+            updateUI();
+            saveData(); // 자동 저장
         }
 
-        function showLevelUpEffect() {
-            // 간단한 레벨업 알림 (3D 텍스트나 화면 효과 추가 가능)
-            const lvlDisplay = document.querySelector('.level-display');
-            lvlDisplay.style.color = '#FFD700';
-            setTimeout(() => lvlDisplay.style.color = 'white', 1000);
+        // --- 레벨업 체크 ---
+        function checkLevelUp() {
+            if (game.xp >= game.maxXp) {
+                game.xp -= game.maxXp;
+                game.level++;
+                game.maxXp = Math.floor(game.maxXp * 1.2);
+                SFX.play('level');
+                
+                // 레벨업 시각 효과 (간단)
+                alert(`🎉 LEVEL UP! Lv.${game.level} 달성!`);
+            }
         }
 
-        // --- 3D 텍스트 효과 ---
-        function spawn3DText(text, xp, gold) {
+        // --- UI 업데이트 ---
+        function updateUI() {
+            document.getElementById('ui-lvl').innerText = game.level;
+            document.getElementById('ui-coin').innerText = game.coins.toLocaleString();
+            document.getElementById('shop-coin').innerText = game.coins.toLocaleString();
+            document.getElementById('ui-cur').innerText = game.xp;
+            document.getElementById('ui-max').innerText = game.maxXp;
+            document.getElementById('ui-bar').style.width = Math.min((game.xp/game.maxXp)*100, 100) + "%";
+
+            // 퀘스트 리스트 렌더링
+            const list = document.getElementById('quest-list-ui');
+            list.innerHTML = '';
+            game.quests.forEach(q => {
+                list.innerHTML += `
+                    <div class="quest-item ${q.done ? 'done' : ''}">
+                        <span><i class="fas ${q.done ? 'fa-check-circle' : 'fa-circle'} quest-check"></i> ${q.title}</span>
+                        <span style="color:#FFD700; font-size:11px;">+${q.gold}G</span>
+                    </div>`;
+            });
+        }
+
+        // --- [UPGRADE] 상점 로직 ---
+        function toggleShop() {
+            SFX.play('click');
+            const modal = document.getElementById('shop-modal');
+            modal.style.display = modal.style.display === 'block' ? 'none' : 'block';
+        }
+
+        function buyItem(item, price) {
+            if(game.coins >= price) {
+                game.coins -= price;
+                SFX.play('coin');
+                alert("구매 완료! (실제 보상으로 교환하세요)");
+                updateUI();
+                saveData();
+            } else {
+                alert("골드가 부족합니다!");
+            }
+        }
+
+        // --- [UPGRADE] 화려한 3D 텍스트 & 코인 효과 ---
+        function spawn3DEffect(text, xp, gold) {
             const el = document.createElement('a-entity');
             const cam = document.querySelector('a-camera');
             const pos = cam.object3D.position;
@@ -326,21 +319,26 @@
             el.setAttribute('position', {x: pos.x + dir.x, y: pos.y + dir.y, z: pos.z + dir.z});
             el.setAttribute('look-at', '[camera]');
 
+            // 텍스트 + 회전하는 코인 모델(원형) 시뮬레이션
             el.innerHTML = `
-                <a-text value="${text}" align="center" position="0 0.25 0" scale="2 2 2" color="#fff" font="mozillavr"></a-text>
+                <a-text value="${text}" align="center" position="0 0.3 0" scale="2 2 2" color="#fff" font="mozillavr"></a-text>
+                <a-entity position="0 0 0" animation="property: rotation; to: 0 360 0; loop: true; dur: 2000">
+                    <a-circle color="#FFD700" radius="0.15" position="-0.6 0 0.1"></a-circle>
+                    <a-circle color="#FFD700" radius="0.15" position="0.6 0 0.1"></a-circle>
+                </a-entity>
                 <a-entity position="0 -0.2 0">
-                    <a-plane color="#000" opacity="0.7" width="1.2" height="0.4"></a-plane>
-                    <a-text value="+${xp} XP  |  +${gold} G" align="center" color="#00E676" scale="2 2 2" z-offset="0.01"></a-text>
+                    <a-plane color="#000" opacity="0.8" width="1.4" height="0.5"></a-plane>
+                    <a-text value="+${xp} XP  +${gold} G" align="center" color="#00E676" scale="2.5 2.5 2.5" z-offset="0.01"></a-text>
                 </a-entity>
             `;
 
             document.getElementById('world-space').appendChild(el);
 
-            // 애니메이션
-            el.setAttribute('animation', `property: position; to: ${pos.x + dir.x} ${pos.y + dir.y + 0.5} ${pos.z + dir.z}; dur: 2000; easing: easeOutQuad`);
-            el.setAttribute('animation__fade', `property: scale; to: 0 0 0; delay: 1500; dur: 500;`);
+            // 위로 떠오르며 사라지는 애니메이션
+            el.setAttribute('animation', `property: position; to: ${pos.x + dir.x} ${pos.y + dir.y + 0.8} ${pos.z + dir.z}; dur: 1500; easing: easeOutQuad`);
+            el.setAttribute('animation__scale', `property: scale; to: 0 0 0; delay: 1000; dur: 500;`);
             
-            setTimeout(() => { if(el.parentNode) el.parentNode.removeChild(el); }, 2000);
+            setTimeout(() => { if(el.parentNode) el.parentNode.removeChild(el); }, 1500);
         }
     </script>
 </body>
