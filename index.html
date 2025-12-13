@@ -1,68 +1,143 @@
+
 <!DOCTYPE html>
 <html lang="ko">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
-    <title>LifeGo Universal AR</title>
+    <title>LifeGo AR: Ultimate HUD</title>
     
     <script src="https://aframe.io/releases/1.6.0/aframe.min.js"></script>
     <script src="https://unpkg.com/aframe-look-at-component@0.8.0/dist/aframe-look-at-component.min.js"></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
 
     <style>
         body { margin: 0; overflow: hidden; background: #000; font-family: 'Segoe UI', sans-serif; }
 
-        /* [1] 실제 카메라 영상이 나올 배경 비디오 */
+        /* [1] 배경 카메라 */
         #camera-feed {
-            position: absolute;
-            top: 0; left: 0;
-            width: 100%; height: 100%;
-            object-fit: cover; /* 화면 꽉 차게 */
-            z-index: 1; /* 제일 뒤 */
-            transform: scaleX(-1); /* 거울모드 (셀카) 방지용, 후면카메라는 JS로 제어 */
+            position: absolute; top: 0; left: 0; width: 100%; height: 100%;
+            object-fit: cover; z-index: 1; transform: scaleX(-1); /* 셀카모드면 반전 필요 */
         }
 
-        /* [2] A-Frame 3D 레이어 */
-        #scene-container {
-            position: absolute;
-            top: 0; left: 0;
-            width: 100%; height: 100%;
-            z-index: 2; /* 비디오 위 */
-        }
-
-        /* [3] UI 레이어 (HUD) */
+        /* [2] UI 레이어 (전체 컨테이너) */
         #ui-layer {
-            position: absolute;
-            top: 0; left: 0;
-            width: 100%; height: 100%;
-            z-index: 3; /* 제일 위 */
-            pointer-events: none;
+            position: absolute; top: 0; left: 0; width: 100%; height: 100%;
+            z-index: 10; pointer-events: none;
             display: flex; flex-direction: column; justify-content: space-between;
             padding: 20px; box-sizing: border-box;
         }
 
-        /* 시작 버튼 */
+        /* --- 상단 프로필 & 스트릭 (좌측 상단) --- */
+        .profile-panel {
+            pointer-events: auto;
+            background: rgba(0, 20, 40, 0.6);
+            backdrop-filter: blur(12px);
+            border: 1px solid rgba(0, 255, 255, 0.3);
+            border-left: 4px solid #00E676;
+            padding: 10px 20px;
+            border-radius: 0 20px 20px 0;
+            color: white;
+            display: inline-flex; align-items: center; gap: 15px;
+            box-shadow: 0 5px 15px rgba(0,0,0,0.3);
+            align-self: flex-start;
+        }
+        .user-avatar {
+            width: 40px; height: 40px; border-radius: 50%;
+            background: url('https://cdn-icons-png.flaticon.com/512/4140/4140048.png') center/cover;
+            border: 2px solid white;
+        }
+        .user-info div:first-child { font-weight: bold; font-size: 14px; color: #00E676; }
+        .user-info div:last-child { font-size: 18px; font-weight: 800; letter-spacing: 1px; }
+
+        .streak-badge {
+            background: rgba(255, 100, 0, 0.2); border: 1px solid #FF6D00;
+            color: #FF6D00; padding: 5px 10px; border-radius: 10px;
+            font-size: 14px; font-weight: bold; display: flex; align-items: center; gap: 5px;
+        }
+
+        /* --- 퀘스트 목록 (우측 상단) --- */
+        .quest-panel {
+            pointer-events: auto;
+            margin-top: 10px;
+            align-self: flex-end;
+            width: 250px;
+        }
+        .quest-header {
+            background: rgba(0, 0, 0, 0.7); color: #00E676;
+            padding: 8px 15px; font-weight: bold; font-size: 14px;
+            border-radius: 10px 10px 0 0; border: 1px solid rgba(0, 255, 255, 0.2);
+            border-bottom: none; display: flex; justify-content: space-between;
+        }
+        .quest-list {
+            background: rgba(0, 20, 40, 0.6); backdrop-filter: blur(10px);
+            border: 1px solid rgba(0, 255, 255, 0.2);
+            border-radius: 0 0 10px 10px; padding: 10px;
+        }
+        .quest-item {
+            display: flex; align-items: center; justify-content: space-between;
+            margin-bottom: 8px; font-size: 13px; color: white;
+            padding: 8px; border-radius: 5px; background: rgba(255,255,255,0.05);
+            transition: all 0.3s;
+        }
+        .quest-item.completed { opacity: 0.5; text-decoration: line-through; background: rgba(0,255,100,0.1); }
+        .quest-reward { color: #FFD700; font-size: 11px; font-weight: bold; }
+
+        /* --- 하단 상태창 & 컨트롤 (하단) --- */
+        .bottom-hud {
+            width: 100%; display: flex; flex-direction: column; gap: 10px;
+        }
+
+        /* 테스트 버튼들 */
+        .sim-actions {
+            pointer-events: auto; display: flex; gap: 10px; justify-content: center;
+        }
+        .btn-action {
+            background: rgba(0, 0, 0, 0.5); border: 1px solid rgba(255,255,255,0.3);
+            color: white; padding: 8px 16px; border-radius: 20px; cursor: pointer;
+            display: flex; align-items: center; gap: 5px; font-size: 13px;
+            transition: 0.2s; backdrop-filter: blur(5px);
+        }
+        .btn-action:hover { background: rgba(0, 230, 118, 0.2); border-color: #00E676; }
+
+        /* 메인 스탯 바 */
+        .status-bar {
+            pointer-events: auto;
+            background: rgba(10, 10, 10, 0.85); backdrop-filter: blur(15px);
+            border-radius: 20px; padding: 15px 25px;
+            border: 1px solid rgba(255,255,255,0.15);
+            box-shadow: 0 0 20px rgba(0,230,118,0.1);
+            display: flex; flex-direction: column; gap: 5px;
+        }
+
+        .stat-row { display: flex; justify-content: space-between; align-items: flex-end; }
+        .level-display { font-size: 32px; font-weight: 900; line-height: 1; color: white; text-shadow: 0 0 10px rgba(0,230,118,0.5); }
+        .level-label { font-size: 12px; color: #aaa; margin-left: 5px; font-weight: normal; }
+        
+        .coin-display { color: #FFD700; font-weight: bold; font-size: 18px; display: flex; align-items: center; gap: 5px; }
+
+        .xp-container {
+            width: 100%; height: 12px; background: rgba(255,255,255,0.1);
+            border-radius: 6px; overflow: hidden; position: relative; margin-top: 5px;
+        }
+        .xp-fill {
+            height: 100%; background: linear-gradient(90deg, #00E676, #00B0FF);
+            width: 0%; transition: width 0.6s cubic-bezier(0.22, 1, 0.36, 1);
+            box-shadow: 0 0 15px #00E676;
+        }
+        .xp-text { font-size: 11px; color: #bbb; text-align: right; margin-top: 2px; }
+
+        /* 시작 화면 */
         #start-overlay {
             position: absolute; top:0; left:0; width:100%; height:100%;
-            background: rgba(0,0,0,0.9); z-index: 999;
+            background: #050505; z-index: 9999;
             display: flex; flex-direction: column; align-items: center; justify-content: center;
             color: white;
         }
         .btn-start {
-            background: #00E676; border: none; padding: 15px 40px; border-radius: 50px;
-            font-size: 20px; font-weight: bold; color: white; margin-top: 20px; cursor: pointer;
+            background: #00E676; border: none; padding: 18px 50px; border-radius: 50px;
+            font-size: 22px; font-weight: bold; color: #000; margin-top: 30px; cursor: pointer;
+            box-shadow: 0 0 30px rgba(0,230,118,0.4); text-transform: uppercase;
         }
-
-        /* 게임 UI 스타일 */
-        .hud-box {
-            pointer-events: auto; background: rgba(0,0,0,0.6); backdrop-filter: blur(5px);
-            padding: 15px; border-radius: 10px; color: white; border: 1px solid rgba(255,255,255,0.2);
-        }
-        .btn-action {
-            pointer-events: auto; background: rgba(0,255,100,0.2); border: 1px solid #00E676; 
-            color: #00E676; padding: 8px 15px; border-radius: 8px; font-weight: bold; margin-bottom: 10px;
-        }
-        .xp-bar-bg { width: 100%; height: 8px; background: #555; border-radius: 4px; margin-top: 5px; }
-        .xp-bar-fill { width: 0%; height: 100%; background: #00E676; transition: width 0.3s; }
     </style>
 </head>
 <body>
@@ -70,104 +145,202 @@
     <video id="camera-feed" autoplay playsinline muted></video>
 
     <div id="start-overlay">
-        <h1>LifeGo AR</h1>
-        <p>카메라 강제 연결 모드</p>
-        <button class="btn-start" onclick="startCamera()">카메라 켜기</button>
-        <p style="color:red; font-size:12px; margin-top:20px;" id="error-msg"></p>
+        <h1 style="font-size: 40px; margin: 0; color: #00E676; text-shadow: 0 0 20px rgba(0,230,118,0.5);">LIFEGO</h1>
+        <p style="letter-spacing: 5px; font-size: 14px; color: #aaa;">AUGMENTED REALITY SYSTEM</p>
+        <button class="btn-start" onclick="initSystem()">SYSTEM START</button>
     </div>
 
     <div id="ui-layer" style="display:none;">
-        <div style="align-self: flex-end; display:flex; flex-direction:column; align-items:flex-end;">
-            <button class="btn-action" onclick="spawn3DText('cleaning')">🧹 청소하기</button>
-            <button class="btn-action" onclick="spawn3DText('dishes')">🍽️ 설거지</button>
+        
+        <div style="width: 100%; display: flex; justify-content: space-between;">
+            <div class="profile-panel">
+                <div class="user-avatar"></div>
+                <div class="user-info">
+                    <div>PLAYER</div>
+                    <div>SEHOON KIM</div>
+                </div>
+                <div class="streak-badge">
+                    <i class="fas fa-fire"></i> 3 Day
+                </div>
+            </div>
+
+            <div class="quest-panel">
+                <div class="quest-header">
+                    <span><i class="fas fa-list-ul"></i> ACTIVE QUESTS</span>
+                    <span id="quest-count">0/3</span>
+                </div>
+                <div class="quest-list" id="quest-container">
+                    </div>
+            </div>
         </div>
 
-        <div class="hud-box" style="width: 100%; max-width: 400px; align-self: center;">
-            <div style="display:flex; justify-content:space-between; align-items:flex-end;">
-                <span style="font-size:24px; font-weight:bold;">LV.<span id="lvl">46</span></span>
-                <span>XP <span id="cur">0</span>/100</span>
+        <div class="bottom-hud">
+            <div class="sim-actions">
+                <button class="btn-action" onclick="triggerEvent('water')"><i class="fas fa-glass-water"></i> 물 마시기</button>
+                <button class="btn-action" onclick="triggerEvent('clean')"><i class="fas fa-broom"></i> 청소하기</button>
+                <button class="btn-action" onclick="triggerEvent('read')"><i class="fas fa-book"></i> 독서하기</button>
             </div>
-            <div class="xp-bar-bg"><div class="xp-bar-fill" id="bar"></div></div>
+
+            <div class="status-bar">
+                <div class="stat-row">
+                    <div>
+                        <span class="level-display" id="lvl-num">46</span>
+                        <span class="level-label">LEVEL</span>
+                    </div>
+                    <div class="coin-display">
+                        <i class="fas fa-coins"></i> <span id="coin-num">1,250</span> G
+                    </div>
+                </div>
+                <div class="xp-container">
+                    <div class="xp-fill" id="xp-bar"></div>
+                </div>
+                <div class="xp-text"><span id="xp-cur">0</span> / <span id="xp-max">100</span> XP</div>
+            </div>
         </div>
     </div>
 
-    <div id="scene-container">
+    <div style="position:absolute; top:0; left:0; width:100%; height:100%; z-index:5;">
         <a-scene embedded vr-mode-ui="enabled: false" renderer="alpha: true; antialias: true;">
             <a-camera position="0 1.6 0" look-controls="enabled: true"></a-camera>
-            
             <a-light type="ambient" intensity="0.8"></a-light>
-            <a-light type="directional" intensity="0.8" position="-1 2 1"></a-light>
-            
-            <a-entity id="world"></a-entity>
+            <a-light type="directional" intensity="1" position="-1 2 1"></a-light>
+            <a-entity id="world-space"></a-entity>
         </a-scene>
     </div>
 
     <script>
-        // --- [핵심] 카메라 강제 연결 함수 ---
-        async function startCamera() {
-            const video = document.getElementById('camera-feed');
-            const overlay = document.getElementById('start-overlay');
-            const ui = document.getElementById('ui-layer');
-            const errBox = document.getElementById('error-msg');
+        // --- 데이터 상태 관리 ---
+        const gameState = {
+            level: 46,
+            xp: 45,
+            maxXp: 100,
+            coins: 1250,
+            quests: [
+                { id: 'water', title: '수분 보충하기', xp: 10, gold: 50, completed: false },
+                { id: 'clean', title: '방 청소하기', xp: 50, gold: 200, completed: false },
+                { id: 'read', title: '전공 서적 읽기', xp: 30, gold: 100, completed: false }
+            ]
+        };
 
+        // --- 초기화 ---
+        async function initSystem() {
             try {
-                // 후면 카메라 요청 (environment)
-                const constraints = { 
-                    video: { facingMode: "environment" }, 
-                    audio: false 
-                };
-                
-                // 브라우저 표준 API 사용 (WebXR 아님)
-                const stream = await navigator.mediaDevices.getUserMedia(constraints);
-                video.srcObject = stream;
+                // 카메라 권한 요청
+                const stream = await navigator.mediaDevices.getUserMedia({ 
+                    video: { facingMode: "environment" } 
+                });
+                document.getElementById('camera-feed').srcObject = stream;
                 
                 // UI 전환
-                overlay.style.display = 'none';
-                ui.style.display = 'flex';
-
-            } catch (err) {
-                console.error(err);
-                errBox.innerText = "카메라 접근 실패: " + err.message + "\n(설정에서 카메라 권한을 허용했나요?)";
-                alert("카메라를 켤 수 없습니다. " + err.message);
+                document.getElementById('start-overlay').style.display = 'none';
+                document.getElementById('ui-layer').style.display = 'flex';
+                
+                renderQuests();
+                updateStats();
+            } catch (e) {
+                alert("카메라 권한이 필요합니다! " + e.message);
             }
         }
 
-        // --- 게임 로직 (이전과 동일) ---
-        let xp = 0; let lv = 46;
+        // --- 퀘스트 렌더링 ---
+        function renderQuests() {
+            const container = document.getElementById('quest-container');
+            container.innerHTML = '';
+            let completeCount = 0;
 
-        function spawn3DText(type) {
-            const title = type === 'cleaning' ? "Vacuuming" : "Washing Dishes";
-            const val = type === 'cleaning' ? 15 : 20;
+            gameState.quests.forEach(q => {
+                if(q.completed) completeCount++;
+                const item = document.createElement('div');
+                item.className = `quest-item ${q.completed ? 'completed' : ''}`;
+                item.innerHTML = `
+                    <div>
+                        <i class="fas ${q.completed ? 'fa-check-circle' : 'fa-circle'}"></i> 
+                        ${q.title}
+                    </div>
+                    <div class="quest-reward">+${q.gold}G</div>
+                `;
+                container.appendChild(item);
+            });
+            document.getElementById('quest-count').innerText = `${completeCount}/${gameState.quests.length}`;
+        }
 
+        // --- 이벤트 발생 (AI 감지 시뮬레이션) ---
+        function triggerEvent(type) {
+            // 1. 퀘스트 찾기
+            const quest = gameState.quests.find(q => q.id === type);
+            if (!quest) return;
+
+            // 2. 3D 텍스트 띄우기
+            spawn3DText(quest.title, quest.xp, quest.gold);
+
+            // 3. 보상 지급 (중복 완료 가능하게 하거나, 1회성으로 하거나 선택 가능)
+            // 여기선 반복 수행 가능하게 설정하되, 퀘스트 UI 상에선 완료 표시
+            if (!quest.completed) {
+                quest.completed = true;
+                renderQuests();
+            }
+
+            // 4. 스탯 업데이트
+            addReward(quest.xp, quest.gold);
+        }
+
+        // --- 보상 로직 ---
+        function addReward(xp, gold) {
+            gameState.xp += xp;
+            gameState.coins += gold;
+
+            // 레벨업 체크
+            if (gameState.xp >= gameState.maxXp) {
+                gameState.xp -= gameState.maxXp;
+                gameState.level++;
+                gameState.maxXp = Math.floor(gameState.maxXp * 1.1);
+                showLevelUpEffect();
+            }
+            updateStats();
+        }
+
+        function updateStats() {
+            document.getElementById('lvl-num').innerText = gameState.level;
+            document.getElementById('coin-num').innerText = gameState.coins.toLocaleString();
+            document.getElementById('xp-cur').innerText = gameState.xp;
+            document.getElementById('xp-max').innerText = gameState.maxXp;
+            
+            const pct = Math.min((gameState.xp / gameState.maxXp) * 100, 100);
+            document.getElementById('xp-bar').style.width = `${pct}%`;
+        }
+
+        function showLevelUpEffect() {
+            // 간단한 레벨업 알림 (3D 텍스트나 화면 효과 추가 가능)
+            const lvlDisplay = document.querySelector('.level-display');
+            lvlDisplay.style.color = '#FFD700';
+            setTimeout(() => lvlDisplay.style.color = 'white', 1000);
+        }
+
+        // --- 3D 텍스트 효과 ---
+        function spawn3DText(text, xp, gold) {
             const el = document.createElement('a-entity');
             const cam = document.querySelector('a-camera');
-            
-            // 카메라가 보는 방향 가져오기
             const pos = cam.object3D.position;
             const dir = new THREE.Vector3(0, 0, -2).applyQuaternion(cam.object3D.quaternion);
 
             el.setAttribute('position', {x: pos.x + dir.x, y: pos.y + dir.y, z: pos.z + dir.z});
             el.setAttribute('look-at', '[camera]');
-            
+
             el.innerHTML = `
-                <a-text value="${title}" align="center" position="0 0.2 0" scale="2 2 2" color="white"></a-text>
-                <a-plane color="#00E676" width="0.8" height="0.3">
-                    <a-text value="+${val} XP" align="center" color="black" z-offset="0.01" scale="2 2 2"></a-text>
-                </a-plane>
+                <a-text value="${text}" align="center" position="0 0.25 0" scale="2 2 2" color="#fff" font="mozillavr"></a-text>
+                <a-entity position="0 -0.2 0">
+                    <a-plane color="#000" opacity="0.7" width="1.2" height="0.4"></a-plane>
+                    <a-text value="+${xp} XP  |  +${gold} G" align="center" color="#00E676" scale="2 2 2" z-offset="0.01"></a-text>
+                </a-entity>
             `;
 
-            document.getElementById('world').appendChild(el);
-            
-            // 애니메이션
-            el.setAttribute('animation', `property: position; to: ${pos.x + dir.x} ${pos.y + dir.y + 0.5} ${pos.z + dir.z}; dur: 1500; easing: easeOutQuad`);
-            setTimeout(() => el.remove(), 1500);
+            document.getElementById('world-space').appendChild(el);
 
-            // XP 증가
-            xp += val;
-            if (xp >= 100) { xp -= 100; lv++; }
-            document.getElementById('lvl').innerText = lv;
-            document.getElementById('cur').innerText = xp;
-            document.getElementById('bar').style.width = xp + "%";
+            // 애니메이션
+            el.setAttribute('animation', `property: position; to: ${pos.x + dir.x} ${pos.y + dir.y + 0.5} ${pos.z + dir.z}; dur: 2000; easing: easeOutQuad`);
+            el.setAttribute('animation__fade', `property: scale; to: 0 0 0; delay: 1500; dur: 500;`);
+            
+            setTimeout(() => { if(el.parentNode) el.parentNode.removeChild(el); }, 2000);
         }
     </script>
 </body>
