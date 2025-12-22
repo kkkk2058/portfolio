@@ -1,4 +1,113 @@
 <!DOCTYPE html>
+<html>
+<head>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>My AR Status Window</title>
+  <script type="importmap">
+  {
+    "imports": {
+      "three": "https://unpkg.com/three@0.160.0/build/three.module.js",
+      "three/addons/": "https://unpkg.com/three@0.160.0/examples/jsm/",
+      "mindar-face-three": "https://cdn.jsdelivr.net/npm/mind-ar@1.2.5/dist/mindar-face-three.prod.js"
+    }
+  }
+  </script>
+  <style>
+    body { margin: 0; overflow: hidden; }
+    #container { width: 100vw; height: 100vh; position: relative; overflow: hidden; }
+    /* 로딩 중 표시 */
+    #loading { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: #000; color: #fff; display: flex; justify-content: center; align-items: center; z-index: 999; }
+  </style>
+</head>
+<body>
+  <div id="loading">AR 시스템 초기화 중...</div>
+  <div id="container"></div>
+
+  <script type="module">
+    import * as THREE from 'three';
+    import { MindARThree } from 'mindar-face-three';
+
+    // 2. 동적 UI 텍스처 생성 함수 (게임 스테이터스 창 만들기)
+    function createStatusTexture(name, level, hp) {
+      const canvas = document.createElement('canvas');
+      canvas.width = 512;
+      canvas.height = 256;
+      const ctx = canvas.getContext('2d');
+
+      // 배경 (반투명 사이버펑크 스타일)
+      ctx.fillStyle = "rgba(0, 20, 50, 0.8)";
+      ctx.fillRect(0, 0, 512, 256);
+      ctx.strokeStyle = "#00ffff";
+      ctx.lineWidth = 10;
+      ctx.strokeRect(5, 5, 502, 246);
+
+      // 텍스트 설정
+      ctx.fillStyle = "#00ffff";
+      ctx.font = "bold 60px Arial";
+      ctx.fillText(`ID: ${name}`, 30, 80);
+      
+      ctx.fillStyle = "#ffffff";
+      ctx.font = "40px Arial";
+      ctx.fillText(`LV.${level} Developer`, 30, 150);
+
+      // HP Bar 디자인
+      ctx.fillStyle = "#333";
+      ctx.fillRect(30, 180, 450, 40);
+      ctx.fillStyle = "#00ff00";
+      ctx.fillRect(30, 180, 450 * (hp / 100), 40); // HP 비율
+
+      const texture = new THREE.CanvasTexture(canvas);
+      return texture;
+    }
+
+    const start = async() => {
+      // 3. MindAR 엔진 초기화 (Vision Engineer 영역)
+      // MindARThree는 웹캠 영상 처리와 Three.js 씬을 연결해줍니다.
+      const mindarThree = new MindARThree({
+        container: document.querySelector("#container"),
+      });
+      
+      const {renderer, scene, camera} = mindarThree;
+
+      // 4. 얼굴 추적 앵커 설정 (1번 앵커 = 코 끝 / 151번 = 이마 중앙)
+      // anchorIndex: 151 (이마)에 고정
+      const anchor = mindarThree.addAnchor(151);
+
+      // 5. AR 오브젝트 생성 (Graphics Engineer 영역)
+      // 위에서 만든 '스탯창' 텍스처를 3D 평면에 입힙니다.
+      const statusTexture = createStatusTexture("KIM", 99, 85);
+      const geometry = new THREE.PlaneGeometry(1, 0.5); // 가로 1, 세로 0.5 크기
+      const material = new THREE.MeshBasicMaterial({ 
+        map: statusTexture, 
+        transparent: true, 
+        opacity: 0.9,
+        side: THREE.DoubleSide // 뒷면에서도 보이게
+      });
+      
+      const statusCard = new THREE.Mesh(geometry, material);
+      
+      // 위치 미세 조정 (이마보다 살짝 위로 띄우기)
+      statusCard.position.y = 0.6; 
+      statusCard.position.z = 0.1; // 얼굴 파고들지 않게 앞으로 살짝 뺌
+      
+      anchor.group.add(statusCard); // 얼굴 앵커 그룹에 자식으로 추가
+
+      // 6. 엔진 실행 루프
+      await mindarThree.start();
+      document.querySelector("#loading").style.display = "none";
+      
+      renderer.setAnimationLoop(() => {
+        renderer.render(scene, camera);
+      });
+    }
+    
+    start();
+  </script>
+</body>
+</html>
+
+
+<!-- <!DOCTYPE html>
 <html lang="ko">
 <head>
     <meta charset="UTF-8">
@@ -506,4 +615,4 @@
         }
     </script>
 </body>
-</html>
+</html> -->
